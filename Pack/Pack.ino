@@ -30,6 +30,9 @@ Adafruit_NeoPixel   Camera(CAMERA_LEDS, PIN_CAMERA, NEO_GRB + NEO_KHZ800);
 #define PASS       "babeface00"
 #define PORT       4884
 
+void setRelay(bool on) {
+}
+
 void setLight(int state) {
     static int brightness = 255;
 
@@ -67,7 +70,6 @@ void switch1Action() {
 }
 
 void switch2Action() {
-    setCamera(-1);
 }
 
 void setup() {
