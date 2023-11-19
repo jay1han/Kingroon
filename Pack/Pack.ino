@@ -30,43 +30,44 @@ Adafruit_NeoPixel   Camera(CAMERA_LEDS, PIN_CAMERA, NEO_GRB + NEO_KHZ800);
 #define PASS       "babeface00"
 #define PORT       4884
 
-void setLight(int brightness) {
-    if (brightness > 8) brightness = 8;
+void setLight(int state) {
+    static int brightness = 255;
+
+    if (state == 0) brightness = 0;
+    else if (state == 1) brightness = 255;
+    else brightness = 255 - brightness;
     for (int led = 0; led < LIGHT_LEDS; led++)
-        Light.setPixelColor(led, Light.Color(31 * brightness, 31 * brightness, 31 * brightness));
+        Light.setPixelColor(led, Light.Color(brightness, brightness, brightness));
     Light.show();
 }
 
-void setCamera(bool on) {
-    int brightness = 0;
-    if (on) brightness = 255;
+void setCamera(int state) {
+    static int brightness = 255;
+
+    if (state == 0) brightness = 0;
+    else if (state == 1) brightness = 255;
+    else brightness = 255 - brightness;
     for (int led = 0; led < CAMERA_LEDS; led++)
         Camera.setPixelColor(led, Light.Color(brightness, brightness, brightness));
     Camera.show();
 }
 
 void doorOpen() {
+    setCamera(1);
+    setLight(1);
 }
 
 void doorClosed() {
+    setCamera(0);
+    setLight(0);
 }
 
 void switch1Action() {
-    static int brightness = 1;
-
-    brightness = brightness * 2;
-    if (brightness > 10) brightness = 1;
-    Serial.printf("Switch1: brightness=%d\n", brightness);
-    setLight(brightness);
+    setLight(-1);
 }
 
 void switch2Action() {
-    static bool on = true;
-
-    on = !on;
-    Serial.printf("Switch2: set light %s\n", on ? "on" : "off");
-    if (on) switch1Action();
-    else setLight(0);
+    setCamera(-1);
 }
 
 void setup() {
@@ -80,7 +81,7 @@ void setup() {
     Camera.begin();
     Camera.clear();
     setLight(1);
-    setCamera(true);
+    setCamera(1);
 
     pinMode(PIN_REED, INPUT_PULLUP);
     pinMode(PIN_SW1,  INPUT);
