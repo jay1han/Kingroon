@@ -39,9 +39,9 @@ void setLight(int brightness) {
 
 void setCamera(bool on) {
     int brightness = 0;
-    if (on) brightness = 8;
-    for (int led = 0; led < LIGHT_LEDS; led++)
-        Camera.setPixelColor(led, Light.Color(31 * brightness, 31 * brightness, 31 * brightness));
+    if (on) brightness = 255;
+    for (int led = 0; led < CAMERA_LEDS; led++)
+        Camera.setPixelColor(led, Light.Color(brightness, brightness, brightness));
     Camera.show();
 }
 
