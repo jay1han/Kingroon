@@ -1,68 +1,244 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <WiFi.h>
+#include <Esp.h>
 #include <HardwareSerial.h>
 #include <driver/uart.h>
-#include <Esp.h>
-#include <Adafruit_NeoPixel.h>
 
-#define PIN_LIGHT   16
-#define PIN_CAMERA  18
-#define PIN_REED    33
-#define PIN_SW1     35
-#define PI_RX       37
-#define PI_TX       39
+#define PIN_SW2     0
+#define PIN_SW1     1
+#define PIN_REED    3
+#define PIN_LIGHT   4
+#define PIN_CAMERA  6
+#define PIN_LCD     7
+#define PI_RX       20
+#define PI_TX       21
+#define PIN_BUZZER  5
+#define PIN_NC      10
 
-#define LD_SDA      12
-#define LD_SCL      11
-#define PIN_SW2     9
-#define PIN_RELAY   7
-#define PD_RX       5
-#define PD_TX       3
+#define LEDS_LIGHT  30
+#define LEDS_CAMERA 3
 
-#define LIGHT_LEDS  30
-#define CAMERA_LEDS 3
+bool isPrinting = false;
+time_t buzzerCycle = 0;
 
-Adafruit_NeoPixel   Light(LIGHT_LEDS, PIN_LIGHT, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel   Camera(CAMERA_LEDS, PIN_CAMERA, NEO_GRB + NEO_KHZ800);
+typedef struct {
+    int        pin;
+    int        numLeds;
+    rmt_obj_t  *rmtObject;
+    rmt_data_t *rmtBuffer;
+} Strip;
+Strip Light, Camera;
 
-#define SSID       "HORS SERVICE"
-#define PASS       "babeface00"
-#define PORT       4884
-
-void setRelay(bool on) {
+void initStrip(Strip *strip, int pin, int numLeds) {
+    Serial.printf("Init strip PIN%d, %d leds ", pin, numLeds);
+    strip->pin     = pin;
+    strip->numLeds = numLeds;
+    strip->rmtBuffer = (rmt_data_t*)calloc(numLeds * 8 * 3, sizeof(rmt_data_t));
+    strip->rmtObject = rmtInit(pin, RMT_TX_MODE, RMT_MEM_64);
+    if (strip->rmtObject == NULL) {
+        Serial.println("FAILED");
+        while(true);
+    }
+    float tick = rmtSetTick(strip->rmtObject, 50.0);
+    if (abs(tick - 50.0) > 1.0) {
+        Serial.printf("tick %.0fns!\n", tick);
+        while(true);
+    }
+    Serial.println("OK");
 }
 
-void setLight(int state) {
-    static int brightness = 255;
-
-    if (state == 0) brightness = 0;
-    else if (state == 1) brightness = 255;
-    else brightness = 255 - brightness;
-    for (int led = 0; led < LIGHT_LEDS; led++)
-        Light.setPixelColor(led, Light.Color(brightness, brightness, brightness));
-    Light.show();
+/*                                           5050 2020
+  T1H 1 code, high voltage time 580ns~1us   =  12   12
+  T1L 1 code, low voltage time 220ns~420ns  =   5    7
+  T0H 0 code, high voltage time 220ns~380ns =   5    5
+  T0L 0 code, low voltage time 580ns~1us    =  12   12
+  RES Frame unit, low voltage time >280us
+*/
+rmt_data_t *stuffBits(rmt_data_t *data, byte level) {
+    for (int bit = 7; bit >= 0; bit--) {
+        if (level & (1 << bit)) {
+            data->level0    = 1;
+            data->duration0 = 12;
+            data->level1    = 0;
+            data->duration1 = 7;
+        } else {
+            data->level0    = 1;
+            data->duration0 = 5;
+            data->level1    = 0;
+            data->duration1 = 12;
+        }
+        data++;
+    }
+    return data;
 }
 
-void setCamera(int state) {
-    static int brightness = 255;
+void sendStrip(Strip *strip, byte r, byte g, byte b) {
+    Serial.printf("Send PIN%d: #%02X%02X%02X ", strip->pin, r, g, b);
+    rmt_data_t *data = strip->rmtBuffer;
+    for (int led = 0; led < strip->numLeds; led++) {
+        // Green
+        data = stuffBits(data, g);
+        // Red
+        data = stuffBits(data, r);
+        // Blue
+        data = stuffBits(data, b);
+    }
 
-    if (state == 0) brightness = 0;
-    else if (state == 1) brightness = 255;
-    else brightness = 255 - brightness;
-    for (int led = 0; led < CAMERA_LEDS; led++)
-        Camera.setPixelColor(led, Light.Color(brightness, brightness, brightness));
-    Camera.show();
+    rmtWriteBlocking(strip->rmtObject, strip->rmtBuffer, strip->numLeds * 8 * 3);
+    Serial.println("Done");
+}
+
+bool wantOK = false;
+char ackMessage[8];
+time_t responseTimeout = 0;
+
+void setLight(int setState) {
+    static int state = 1;
+
+    if (setState >= 0) state = setState;
+    else state = 1 - state;
+    Serial.printf("Light %s\n", state == 1 ? "on" : "off");
+    sendStrip(&Light, state * 255, state * 255, state * 255);
+    Serial1.printf("KR:L%d\n", state);
+    setBacklight(state == 1 ? 100 : 5);
+}
+
+void setCamera(int setState) {
+    static int state = 2;
+    if (setState >= 0) {
+        state = setState;
+    } else {
+        state = 3 - state;
+    }
+    
+    int brightness = 0;
+    switch (setState) {
+    case 1: brightness = 20; break;
+    case 2: brightness = 255; break;
+    }
+    sendStrip(&Camera, brightness, brightness, brightness);
+    Serial.printf("Camera %d\n", state);
+}
+
+void setBacklight(float duty) {
+    Serial.printf("Backlight %.0f%\n", duty);
+    int value = (int)(255.0 * duty) / 100;
+    analogWrite(PIN_LCD, value);
+}
+
+#define BUZZ_START    1
+#define BUZZ_END      2
+#define BUZZ_DOOR     3
+#define BUZZ_ALERT    4
+#define BUZZ_BOOT     9
+#define BUZZ_CONTINUE -1
+
+unsigned long buzzerTimer = 0;
+void setBuzzer(int tone) {
+    static int running = 0;
+    static int cycle = 0;
+    
+    if (tone == 0) { // stop
+        running = 0;
+        Serial.println("Buzzer: stopped");
+    } else if (tone > 0) { // (re)start alert
+        running = tone;
+        cycle = 0;
+        Serial.printf("Buzzer: %d", running);
+    } // fall-through: continue
+    if (running == 0) {
+        buzzerTimer = 0;
+        return;
+    }
+    
+    switch (running) {
+    case BUZZ_START: // Print started: 5 beeps
+        if (cycle == 5) { // finished
+            running = 0;
+            analogWrite(PIN_BUZZER, 0);
+        } else {
+            if (cycle % 2 == 0) {
+                analogWrite(PIN_BUZZER, 128);
+                buzzerTimer = millis() + 200;
+            } else {
+                analogWrite(PIN_BUZZER, 0);
+                buzzerTimer = millis() + 100;
+            }
+        }
+        break;
+
+    case BUZZ_END: // Print ended: 1 long beep
+        if (cycle == 1) { // finished
+            running = 0;
+            analogWrite(PIN_BUZZER, 0);
+        } else {
+            analogWrite(PIN_BUZZER, 128);
+            buzzerTimer = millis() + 1500;
+        }
+        break;
+
+    case BUZZ_DOOR: // Door closed OK: 2 short beeps
+        if (cycle == 3) { // finished
+            running = 0;
+            analogWrite(PIN_BUZZER, 0);
+        } else {
+            if (cycle % 2 == 0) {
+                analogWrite(PIN_BUZZER, 255);
+                buzzerTimer = millis() + 150;
+            } else {
+                analogWrite(PIN_BUZZER, 0);
+                buzzerTimer = millis() + 50;
+            }
+        }
+        break;
+        
+    case BUZZ_ALERT: // Door closed while printing: long beeps forever
+        if (cycle % 2 == 0) {
+            analogWrite(PIN_BUZZER, 255);
+            buzzerTimer = millis() + 500;
+        } else {
+            analogWrite(PIN_BUZZER, 0);
+            buzzerTimer = millis() + 400;
+        }
+        break;
+
+    case BUZZ_BOOT: // Booting: one beep
+        if (cycle == 1) { // finished
+            running = 0;
+            analogWrite(PIN_BUZZER, 0);
+        } else {
+            analogWrite(PIN_BUZZER, 80);
+            buzzerTimer = millis() + 100;
+        }
+        break;
+    }
+    cycle ++;
 }
 
 void doorOpen() {
-    setCamera(1);
+    Serial.println("Door open");
+    strcpy(ackMessage, "KR:DO\n");
+    Serial1.print(ackMessage);
+    wantOK = true;
+    responseTimeout = time(NULL) + 5;
     setLight(1);
+    setCamera(2);
 }
 
 void doorClosed() {
-    setCamera(0);
+    Serial.println("Door closed");
+    strcpy(ackMessage, "KR:DC\n");
+    Serial1.print(ackMessage);
+    wantOK = true;
+    responseTimeout = time(NULL) + 5;
     setLight(0);
+    setCamera(0);
+    
+    if (isPrinting) {
+        setBuzzer(BUZZ_ALERT);
+    } else {
+        setBuzzer(BUZZ_DOOR);
+    }
 }
 
 void switch1Action() {
@@ -70,49 +246,34 @@ void switch1Action() {
 }
 
 void switch2Action() {
+    setCamera(-1);
 }
 
 void setup() {
-    Serial.begin(2000000);
+    Serial.begin(115200);
     Serial.println("START");
     delay(2000);
     Serial.println("START");
 
-    Light.begin();
-    Light.clear();
-    Camera.begin();
-    Camera.clear();
-    setLight(1);
-    setCamera(1);
+    initStrip(&Light, PIN_LIGHT, LEDS_LIGHT);
+    initStrip(&Camera, PIN_CAMERA, LEDS_CAMERA);
 
-    pinMode(PIN_REED, INPUT_PULLUP);
-    pinMode(PIN_SW1,  INPUT);
-    pinMode(PIN_SW2,  INPUT);
-    pinMode(PIN_RELAY, OUTPUT_OPEN_DRAIN);
-    digitalWrite(PIN_RELAY, LOW);
+    pinMode(PIN_REED,   INPUT_PULLUP);
+    pinMode(PIN_SW1,    INPUT);
+    pinMode(PIN_SW2,    INPUT);
+    pinMode(PIN_LCD,    OUTPUT);
+    pinMode(PIN_BUZZER, OUTPUT);
+
+    analogWriteFrequency(1001);
+    analogWriteResolution(8);
                     
-    Wire.setPins(LD_SDA, LD_SCL);
-    if (!Wire.begin()) {
-        Serial.println("I2C init failed");
-    }
+    setLight(1);
+    setCamera(2);
+    setBacklight(100);
+    setBuzzer(BUZZ_BOOT);
 
-    WiFi.begin(SSID, PASS);
-    Serial.printf("WiFi \"%s\" ", SSID);
-    int wait = 0;
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
-        if (++wait > 20) {
-            Serial.println(" Failed! Rebooting");
-            delay(1000);
-            ESP.restart();
-        }
-        Serial.print(".");
-    }
-    Serial.print("OK IP=");
-    Serial.println(WiFi.localIP());
-
-    uart_set_pin(UART_NUM_1, 3, 5, -1, -1);
-    Serial1.begin(115200);
+    Serial1.begin(9600, SERIAL_8N1, PI_RX, PI_TX);
+    Serial1.print("\n\n\nKR:OK\n");
 }
 
 #define DOOR_OPEN     1
@@ -133,6 +294,7 @@ void loop() {
                 doorClosed();
             }
         } else if (Reed == DOOR_OPEN) {
+            Serial.println("Reed closed");
             ReedDebounce = millis() + 1000;
             Reed = DOOR_CLOSED;
         }
@@ -143,6 +305,7 @@ void loop() {
                 doorOpen();
             }
         } else if (Reed == DOOR_CLOSED) {
+            Serial.println("Reed open");
             ReedDebounce = millis() + 1000;
             Reed = DOOR_OPEN;
         }
@@ -187,5 +350,85 @@ void loop() {
         }
     }
 
-    // WiFi here
+    char message[8];
+    int messageLength;
+    while (Serial1.available() > 0 &&
+           (messageLength = Serial1.readBytesUntil('\n', message, 7)) > 0) {
+        message[7] = 0;
+        Serial.printf("Received \"%s\"\n", message);
+        if (messageLength < 5 || strncmp(message, "KR:", 3) != 0) {
+//            Serial1.print("KR:NO\n");
+            continue;
+        }
+        switch(message[3]) {
+        case 'C':
+            if (message[4] >= '0' && message[4] <= '3') {
+                setCamera(message[4] - '0');
+                Serial1.print("KR:OK\n");
+            } else {
+//                Serial1.print("KR:NO\n");
+            }
+            break;
+
+        case 'B':
+            if (message[4] >= '0' && message[4] <= '9') {
+                float duty = 100.0 * (float)(message[4] - '0') / 9.0;
+                setBacklight(duty);
+                Serial1.print("KR:OK\n");
+            } else {
+//                Serial1.print("KR:NO\n");
+            }
+            break;
+
+        case 'O':
+            if (wantOK && message[4] == 'K') {
+                Serial.println("Clear wantOK");
+                wantOK = false;
+            } else {
+//                Serial1.print("KR:NO\n");
+            }
+            break;
+
+        case 'P':
+            switch(message[4]) {
+            case 'S':
+                isPrinting = true;
+                setBuzzer(BUZZ_START);
+                Serial1.print("KR:OK\n");
+                break;
+                
+            case 'E':
+                isPrinting = false;
+                setBuzzer(BUZZ_END);
+                Serial1.print("KR:OK\n");
+                break;
+                
+            default:
+//                Serial1.print("KR:NO\n");
+                break;
+            }
+            break;
+
+        case 'A':
+            setBuzzer(message[4] - '0');
+            Serial1.print("KR:OK\n");
+            break;
+
+        default:
+//            Serial1.print("KR:NO\n");
+            break;
+        }
+    }
+
+    if (wantOK && time(NULL) > responseTimeout) {
+        Serial.printf("Resend \"%s\"\n", ackMessage);
+        Serial1.print(ackMessage);
+        responseTimeout = time(NULL) + 5;
+    }
+
+    if (millis() > buzzerTimer) {
+        setBuzzer(BUZZ_CONTINUE);
+    }
+
+    delay(50);
 }
