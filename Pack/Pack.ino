@@ -91,6 +91,7 @@ void sendStrip(Strip *strip, byte r, byte g, byte b) {
 bool wantOK = false;
 char ackMessage[8];
 time_t responseTimeout = 0;
+time_t heartbeatTimeout = 0;
 
 void setLight(int setState) {
     static int state = 1;
@@ -103,19 +104,26 @@ void setLight(int setState) {
     setBacklight(state == 1 ? 100 : 5);
 }
 
-void setCamera(int setState) {
-    static int state = 2;
-    if (setState >= 0) {
-        state = setState;
-    } else {
-        state = 3 - state;
+#define CAMERA_INIT     0
+#define CAMERA_OPEN     1
+#define CAMERA_CLOSE    2
+#define CAMERA_TOGGLE   3
+
+void setCamera(int setMode) {
+    static bool isOpen = true;
+    static bool isHigh = true;
+
+    switch (setMode) {
+    case CAMERA_INIT:   isOpen = isHigh = true; break;
+    case CAMERA_OPEN:   isOpen = true; break;
+    case CAMERA_CLOSE:  isOpen = true; break;
+    case CAMERA_TOGGLE: isHigh = !isHigh; break;
     }
-    
-    int brightness = 0;
-    switch (setState) {
-    case 1: brightness = 20; break;
-    case 2: brightness = 255; break;
-    }
+
+    int brightness;
+    if (!isOpen) brightness = 0;
+    else if (isHigh) brightness = 255;
+    else brightness = 20;
     sendStrip(&Camera, brightness, brightness, brightness);
     Serial.printf("Camera %d\n", state);
 }
@@ -222,7 +230,9 @@ void doorOpen() {
     wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(1);
-    setCamera(2);
+    setCamera(CAMERA_OPEN);
+
+    setBuzzer(BUZZ_BOOT);
 }
 
 void doorClosed() {
@@ -232,7 +242,7 @@ void doorClosed() {
     wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(0);
-    setCamera(0);
+    setCamera(CAMERA_CLOSE);
     
     if (isPrinting) {
         setBuzzer(BUZZ_ALERT);
@@ -246,7 +256,7 @@ void switch1Action() {
 }
 
 void switch2Action() {
-    setCamera(-1);
+    setCamera(CAMERA_TOGGLE);
 }
 
 void setup() {
@@ -268,7 +278,7 @@ void setup() {
     analogWriteResolution(8);
                     
     setLight(1);
-    setCamera(2);
+    setCamera(CAMERA_INIT);
     setBacklight(100);
     setBuzzer(BUZZ_BOOT);
 
@@ -430,5 +440,10 @@ void loop() {
         setBuzzer(BUZZ_CONTINUE);
     }
 
-    delay(50);
+    if (time(NULL) > heartbeatTimeout) {
+        Serial1.print("KR:OK\n");
+        hearbeatTimeout = time(NULL) + 60;
+    }
+
+    delay(10);
 }
