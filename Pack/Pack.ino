@@ -125,7 +125,7 @@ void setCamera(int setMode) {
     else if (isHigh) brightness = 255;
     else brightness = 20;
     sendStrip(&Camera, brightness, brightness, brightness);
-    Serial.printf("Camera %d\n", state);
+    Serial.printf("Camera %d\n", brightness);
 }
 
 void setBacklight(float duty) {
@@ -442,7 +442,7 @@ void loop() {
 
     if (time(NULL) > heartbeatTimeout) {
         Serial1.print("KR:OK\n");
-        hearbeatTimeout = time(NULL) + 60;
+        heartbeatTimeout = time(NULL) + 60;
     }
 
     delay(10);
