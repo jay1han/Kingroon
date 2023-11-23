@@ -374,7 +374,7 @@ void loop() {
         case 'C':
             if (message[4] >= '0' && message[4] <= '3') {
                 setCamera(message[4] - '0');
-                Serial1.print("KR:OK\n");
+                Serial1.print("KR:ok\n");
             } else {
 //                Serial1.print("KR:NO\n");
             }
@@ -384,16 +384,19 @@ void loop() {
             if (message[4] >= '0' && message[4] <= '9') {
                 float duty = 100.0 * (float)(message[4] - '0') / 9.0;
                 setBacklight(duty);
-                Serial1.print("KR:OK\n");
+                Serial1.print("KR:ok\n");
             } else {
 //                Serial1.print("KR:NO\n");
             }
             break;
 
         case 'O':
-            if (wantOK && message[4] == 'K') {
-                Serial.println("Clear wantOK");
-                wantOK = false;
+            if (message[4] == 'K') {
+                if (wantOK) {
+                    Serial.println("Clear wantOK");
+                    wantOK = false;
+                }
+                Serial1.print("KR:ok\n");
             } else {
 //                Serial1.print("KR:NO\n");
             }
@@ -404,13 +407,13 @@ void loop() {
             case 'S':
                 isPrinting = true;
                 setBuzzer(BUZZ_START);
-                Serial1.print("KR:OK\n");
+                Serial1.print("KR:ok\n");
                 break;
                 
             case 'E':
                 isPrinting = false;
                 setBuzzer(BUZZ_END);
-                Serial1.print("KR:OK\n");
+                Serial1.print("KR:ok\n");
                 break;
                 
             default:
@@ -421,7 +424,7 @@ void loop() {
 
         case 'A':
             setBuzzer(message[4] - '0');
-            Serial1.print("KR:OK\n");
+            Serial1.print("KR:ok\n");
             break;
 
         default:
