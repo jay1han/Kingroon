@@ -102,7 +102,7 @@ void setLight(int setState) {
     else state = 1 - state;
     Serial.printf("Light %s\n", state == 1 ? "on" : "off");
     sendStrip(&Light, state * 255, state * 255, state * 255);
-    Serial1.printf("KR:L%d.\n", state);
+    Serial1.printf("KR:L%d\n", state);
     setBacklight(state == 1 ? 100 : 10);
 }
 
@@ -244,7 +244,7 @@ void setBuzzer(int tone) {
 
 void doorOpen() {
     Serial.println("Door open");
-    strcpy(ackMessage, "KR:DO.\n");
+    strcpy(ackMessage, "KR:DO\n");
     Serial1.print(ackMessage);
     wantOK = true;
     responseTimeout = time(NULL) + 5;
@@ -259,7 +259,7 @@ void doorOpen() {
 
 void doorClosed() {
     Serial.println("Door closed");
-    strcpy(ackMessage, "KR:DC.\n");
+    strcpy(ackMessage, "KR:DC\n");
     Serial1.print(ackMessage);
     wantOK = true;
     responseTimeout = time(NULL) + 5;
@@ -312,7 +312,7 @@ void setup() {
     setBuzzer(BUZZ_BOOT);
 
     Serial1.begin(9600, SERIAL_8N1, PI_RX, PI_TX);
-    Serial1.print("\n\n\nKR:OK.\n");
+    Serial1.print("\n\n\nKR:OK\n");
     heartbeatTimeout = time(NULL) + 60;
 }
 
@@ -404,7 +404,7 @@ void loop() {
         case 'C':
             if (message[4] >= '0' && message[4] <= '3') {
                 setCamera(message[4] - '0');
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
             } else {
                 Serial.println("Ignored");
             }
@@ -414,7 +414,7 @@ void loop() {
             if (message[4] >= '0' && message[4] <= '9') {
                 float duty = 100.0 * (float)(message[4] - '0') / 9.0;
                 setBacklight(duty);
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
             } else {
                 Serial.println("Ignored");
             }
@@ -427,7 +427,7 @@ void loop() {
                     Serial.println("Clear wantOK");
                     wantOK = false;
                 }
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
             } else {
                 Serial.println("Ignored");
             }
@@ -438,13 +438,13 @@ void loop() {
             case 'S':
                 isPrinting = true;
                 setBuzzer(BUZZ_START);
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
                 break;
                 
             case 'E':
                 isPrinting = false;
                 setBuzzer(BUZZ_END);
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
                 break;
                 
             default:
@@ -457,17 +457,17 @@ void loop() {
             if (message[4] == '1') {
                 isPowered = true;
                 setRelay(1);
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
             } else {
                 isPowered = false;
                 setRelay(0);
-                Serial1.print("KR:ok.\n");
+                Serial1.print("KR:ok\n");
             }
             break;
 
         case 'A':
             setBuzzer(message[4] - '0');
-            Serial1.print("KR:ok.\n");
+            Serial1.print("KR:ok\n");
             break;
 
         default:
@@ -495,7 +495,7 @@ void loop() {
     }
 
     if (time(NULL) > heartbeatTimeout) {
-        Serial1.print("KR:OK.\n");
+        Serial1.print("KR:OK\n");
         heartbeatTimeout = time(NULL) + 60;
         Serial.println("Heartbeat");
     }
