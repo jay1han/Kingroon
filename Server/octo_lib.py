@@ -1,6 +1,59 @@
-﻿import i2c_lib
+#!/usr/bin/python3
+
+# Common library for Octopus management
+
+import fcntl, os
+LOCK_FILE  = './octobox.lock'
+
+def lock_lib():
+   lock = open(LOCK_FILE, 'r+')
+   fcntl.lockf(lock, fcntl.LOCK_EX)
+   return lock
+
+def free_lib(lock, erase=False):
+   lock.close()
+   if erase:
+      os.truncate(LOCK_FILE, 0)
+      
+
+#################################################################
+# Display management
+
+import smbus2
 from time import sleep
 
+class i2c_device:
+   def __init__(self, addr, port=0):
+      self.addr = addr
+      self.bus = smbus2.SMBus(port)
+
+# Write a single command
+   def write_cmd(self, cmd):
+      self.bus.write_byte(self.addr, cmd)
+      sleep(0.0001)
+
+# Write a command and argument
+   def write_cmd_arg(self, cmd, data):
+      self.bus.write_byte_data(self.addr, cmd, data)
+      sleep(0.0001)
+
+# Write a block of data
+   def write_block_data(self, cmd, data):
+      self.bus.write_block_data(self.addr, cmd, data)
+      sleep(0.0001)
+
+# Read a single byte
+   def read(self):
+      return self.bus.read_byte(self.addr)
+
+# Read
+   def read_data(self, cmd):
+      return self.bus.read_byte_data(self.addr, cmd)
+
+# Read a block of data
+   def read_block_data(self, cmd):
+      return self.bus.read_block_data(self.addr, cmd)
+      
 # LCD Address
 ADDRESS = 0x27
 
@@ -50,10 +103,10 @@ En = 0b00000100 # Enable bit
 Rw = 0b00000010 # Read/Write bit
 Rs = 0b00000001 # Register select bit
 
-class lcd:
+class HD44780:
    #initializes objects and lcd
    def __init__(self):
-      self.lcd_device = i2c_lib.i2c_device(ADDRESS)
+      self.lcd_device = i2c_lib.i2c_device(ADDRESS, 0)
 
       self.lcd_write(0x03)
       self.lcd_write(0x03)
@@ -109,3 +162,10 @@ class lcd:
    def lcd_clear(self):
       self.lcd_write(LCD_CLEARDISPLAY)
       self.lcd_write(LCD_RETURNHOME)
+
+#################################################################
+# Serial port
+
+import serial
+UART = serial.Serial('/dev/ttyS1', baudrate=9600, timeout=0)
+
