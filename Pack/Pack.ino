@@ -326,7 +326,7 @@ void setup() {
     analogWriteResolution(8);
                     
     setLight(1);
-    setCamera(CAMERA_ON);
+    setCamera(CAMERA_OFF);
     setBacklight(100);
     setBuzzer(BUZZ_BOOT);
 
