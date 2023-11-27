@@ -168,4 +168,3 @@ class HD44780:
 
 import serial
 UART = serial.Serial('/dev/ttyS1', baudrate=9600, timeout=0)
-
