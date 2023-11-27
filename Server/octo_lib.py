@@ -155,6 +155,7 @@ class HD44780:
       if line == 4:
          self.lcd_write(0xD4)
 
+         string += ' ' * 20
       for char in string[:20]:
          self.lcd_write(ord(char), Rs)
 

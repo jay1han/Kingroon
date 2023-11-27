@@ -9,5 +9,5 @@ cp html/*.html /var/www/html/
 cp octobox.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable octobox
-systemctl start octobox
+systemctl restart octobox
 systemctl status octobox

@@ -105,14 +105,20 @@ def readOcto():
             lcd.lcd_display_string(2, fileName)
 
         completion = job['progress']['completion']
+        if completion is None: completion = 0
         fileEstimate = job['job']['estimatedPrintTime']
+        if fileEstimate is None: fileEstimate = 0
         currentTime = job['progress']['printTime']
-        remainingTime = job['progress']['printTimeLeft']
-        eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
-        eta_round = eta.replace(second=0)
-        
+        if currentTime is None: currentTime = 0
         lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
-        lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
+        
+        remainingTime = job['progress']['printTimeLeft']
+        if remainingTime is not None and remainingTime > 0:
+            eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
+            eta_round = eta.replace(second=0)
+            lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
+        else:
+            lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
 
 def readEvent():
     lock = lock_lib()
