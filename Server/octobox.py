@@ -46,23 +46,27 @@ isPaused = False
 def sendOctoprint(data):
     try:
         urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', data)
-    except URLError:
+    except OSError:
         pass
 
 def doorOpen():
     if isPaused:
+        print('Door open: Resume');
         sendOctoprint('{ "command": "pause", "action": "resume" }')
 
 def doorClosed():
     if not isPaused:
+        print('Door closed: Pause');
         sendOctoprint('{ "command": "pause", "action": "pause" }')
 
 def startCamera():
     webcam = subprocess.Popen(webcamPopen)
     shutil.copyfile('/var/www/html/stream.html', '/var/www/html/index.html')
+    print(f'Started webcam process {webcam.pid}')
     sendUART('KR:C1')
 
 def stopCamera():
+    print(f'Stopping webcam process {webcam.pid}')
     webcam.terminate()
     subprocess.run(captureRun)
     shutil.copyfile('/var/www/html/still.html', '/var/www/html/index.html')
@@ -120,13 +124,14 @@ def readOcto():
                 lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
             else:
                 lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
-    except URLError:
+    except OSError:
         pass
 
 def readEvent():
     lock = lock_lib()
     event = lock.read().strip()
     if event[:3] == 'KR:':
+        print(event)
         if event[3] == 'P':
             if event[4] == 'P':
                 isPaused = True
@@ -136,7 +141,6 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
-        sendUART(event)
             
     free_lib(lock, erase=True);
 
