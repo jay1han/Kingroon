@@ -174,6 +174,7 @@ void setBuzzer(int tone) {
     if (tone == 0) { // stop
         running = 0;
         Serial.println("Buzzer: stopped");
+        analogWrite(PIN_BUZZER, 0);
     } else if (tone == BUZZ_ON) { // on forever: no timer
         running = 0;
         Serial.println("Buzzer: on");
@@ -361,7 +362,7 @@ int bounceLong(int step, unsigned int debounce) {
 
         default:
             setBuzzer(BUZZ_OFF);
-            return -1;
+            return 0;
         }
     } else {
         return -1;
@@ -420,6 +421,7 @@ void loop() {
             Serial.println("Switch2 left");
             Switch2 = 0;
             Debounce2 = STALE;
+            setBuzzer(BUZZ_OFF);
         }
     } else { // Switch touched
         if (Switch2 > 0) {
