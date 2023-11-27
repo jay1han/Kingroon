@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from octo_lib import lock_lib, free_lib
+from octo_lib import lock_lib, free_lib, sendUART
 from sys import argv as args
 
 action = args[1]

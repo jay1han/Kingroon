@@ -44,7 +44,10 @@ tickTimeout = datetime.now() + timedelta(seconds=5)
 isPaused = False
 
 def sendOctoprint(data):
-    urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', data)
+    try:
+        urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', data)
+    except URLError:
+        pass
 
 def doorOpen():
     if isPaused:
@@ -91,34 +94,37 @@ def printTime(seconds):
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
 def readOcto():
-    with urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0') as jobapi:
-        job = json.loads(jobapi.read())
+    try:
+        with urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0') as jobapi:
+            job = json.loads(jobapi.read())
 
-        state = job['state']
-        lcd.lcd_display_string(1, state)
+            state = job['state']
+            lcd.lcd_display_string(1, state)
 
-        fileName = job['job']['file']['name']
-        if fileName is None:
-            lcd.lcd_display_string(2, "")
-        else:
-            fileName.removesuffix('.gcode')
-            lcd.lcd_display_string(2, fileName)
+            fileName = job['job']['file']['name']
+            if fileName is None:
+                lcd.lcd_display_string(2, "")
+            else:
+                fileName.removesuffix('.gcode')
+                lcd.lcd_display_string(2, fileName)
 
-        completion = job['progress']['completion']
-        if completion is None: completion = 0
-        fileEstimate = job['job']['estimatedPrintTime']
-        if fileEstimate is None: fileEstimate = 0
-        currentTime = job['progress']['printTime']
-        if currentTime is None: currentTime = 0
-        lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
-        
-        remainingTime = job['progress']['printTimeLeft']
-        if remainingTime is not None and remainingTime > 0:
-            eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
-            eta_round = eta.replace(second=0)
-            lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
-        else:
-            lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
+            completion = job['progress']['completion']
+            if completion is None: completion = 0
+            fileEstimate = job['job']['estimatedPrintTime']
+            if fileEstimate is None: fileEstimate = 0
+            currentTime = job['progress']['printTime']
+            if currentTime is None: currentTime = 0
+            lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
+
+            remainingTime = job['progress']['printTimeLeft']
+            if remainingTime is not None and remainingTime > 0:
+                eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
+                eta_round = eta.replace(second=0)
+                lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
+            else:
+                lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
+    except URLError:
+        pass
 
 def readEvent():
     lock = lock_lib()
