@@ -95,6 +95,33 @@ char ackMessage[8];
 time_t responseTimeout = 0;
 time_t heartbeatTimeout = 0;
 
+#define CAMERA_ON       0
+#define CAMERA_BRIGHT   1
+#define CAMERA_DARK     2
+#define CAMERA_OFF      3
+
+void setCamera(int setMode) {
+    static bool isHigh  = true;
+    static bool isLight = true;
+
+    switch (setMode) {
+    case CAMERA_ON:     isHigh = true; break;
+    case CAMERA_BRIGHT: isLight = true; break;
+    case CAMERA_DARK:   isLight = false; break;
+    case CAMERA_OFF:    isHigh = false; break;
+    }
+
+    int brightness;
+    if (isHigh) {
+        if (isLight) brightness = 255;
+        else brightness = 40;
+    }
+    else brightness = 0;
+    
+    sendStrip(&Camera, brightness, brightness, brightness);
+    Serial.printf("Camera %d\n", brightness);
+}
+
 void setLight(int setState) {
     static int state = 1;
 
@@ -104,30 +131,7 @@ void setLight(int setState) {
     sendStrip(&Light, state * 255, state * 255, state * 255);
     Serial1.printf("KR:L%d\n", state);
     setBacklight(state == 1 ? 100 : 10);
-}
-
-#define CAMERA_INIT     0
-#define CAMERA_OPEN     1
-#define CAMERA_CLOSE    2
-#define CAMERA_TOGGLE   3
-
-void setCamera(int setMode) {
-    static bool isOpen = true;
-    static bool isHigh = true;
-
-    switch (setMode) {
-    case CAMERA_INIT:   isOpen = isHigh = true; break;
-    case CAMERA_OPEN:   isOpen = true; break;
-    case CAMERA_CLOSE:  isOpen = true; break;
-    case CAMERA_TOGGLE: isHigh = !isHigh; break;
-    }
-
-    int brightness;
-    if (!isOpen) brightness = 0;
-    else if (isHigh) brightness = 255;
-    else brightness = 20;
-    sendStrip(&Camera, brightness, brightness, brightness);
-    Serial.printf("Camera %d\n", brightness);
+    setCamera(CAMERA_DARK + state);
 }
 
 void setBacklight(float duty) {
@@ -136,17 +140,29 @@ void setBacklight(float duty) {
     analogWrite(PIN_LCD, value);
 }
 
-void setRelay(int state) {
-    Serial.printf("Relay %d\n", state);
+void setRelay(int command) {
+    static int state;
+    
+    Serial.printf("Relay command %d, state %d", command, state);
+    if (command < 0) state = 1 - state;
+    else state = command;
+    Serial.printf(" -> %d\n", state);
+
     if (state == 1) digitalWrite(PIN_RELAY, 1);
     else digitalWrite(PIN_RELAY, 0);
+    Serial1.printf("KR:R%d\n", state);
+    
+    isPowered = state;
+    if (!isPowered) isPrinting = false;
 }
 
+#define BUZZ_OFF      0
 #define BUZZ_START    1
 #define BUZZ_END      2
 #define BUZZ_DOOR     3
 #define BUZZ_ALERT    4
 #define BUZZ_NOTICE   5
+#define BUZZ_ON       8
 #define BUZZ_BOOT     9
 #define BUZZ_CONTINUE -1
 
@@ -158,11 +174,16 @@ void setBuzzer(int tone) {
     if (tone == 0) { // stop
         running = 0;
         Serial.println("Buzzer: stopped");
+    } else if (tone == BUZZ_ON) { // on forever: no timer
+        running = 0;
+        Serial.println("Buzzer: on");
+        analogWrite(PIN_BUZZER, 128);
     } else if (tone > 0) { // (re)start alert
         running = tone;
         cycle = 0;
         Serial.printf("Buzzer: %d\n", running);
     } // fall-through: continue
+    
     if (running == 0) {
         buzzerTimer = 0;
         return;
@@ -249,7 +270,6 @@ void doorOpen() {
     wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(1);
-    setCamera(CAMERA_OPEN);
     if (powerTimeout > 0) {
         powerTimeout = 0;
     }
@@ -264,7 +284,6 @@ void doorClosed() {
     wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(0);
-    setCamera(CAMERA_CLOSE);
     
     if (isPowered) {
         if (isPrinting) {
@@ -283,7 +302,7 @@ void switch1Action() {
 }
 
 void switch2Action() {
-    setCamera(CAMERA_TOGGLE);
+    setRelay(-1);
 }
 
 void setup() {
@@ -307,7 +326,7 @@ void setup() {
     analogWriteResolution(8);
                     
     setLight(1);
-    setCamera(CAMERA_INIT);
+    setCamera(CAMERA_ON);
     setBacklight(100);
     setBuzzer(BUZZ_BOOT);
 
@@ -318,12 +337,32 @@ void setup() {
 
 #define DOOR_OPEN     1
 #define DOOR_CLOSED   0
-#define SW_TOUCHED    1
-#define SW_LIFTED     0
 #define STALE         0
 
-int Reed = DOOR_OPEN, Switch1 = SW_LIFTED, Switch2 = SW_LIFTED;
+int Reed = DOOR_OPEN, Switch1 = 0, Switch2 = 0;
 unsigned int ReedDebounce = STALE, Debounce1 = STALE, Debounce2 = STALE;
+
+// For each step and current debounce, return
+// 0 if STALE, negative to continue current bounce, positive debounce millseconds
+int bounceLong(int step, unsigned int debounce) {
+    switch(step) {
+    case 1: case 3: case 5:
+        setBuzzer(BUZZ_OFF);
+        return 600;
+
+    case 0: case 2: case 4:
+        setBuzzer(BUZZ_ON);
+        return 100;
+
+    case 6:
+        setBuzzer(BUZZ_ON);
+        return 1200;
+
+    default:
+        setBuzzer(BUZZ_OFF);
+        return -1;
+    }
+}
 
 void loop() {
     // Debounce Door both ways
@@ -353,40 +392,47 @@ void loop() {
 
     // Debounce switches only when touched
     if (digitalRead(PIN_SW1) == 0) { // Switch lifted
-        if (Switch1 == SW_TOUCHED) {
+        if (Switch1 > 0) {
             Serial.println("Switch1 left");
-            Switch1 = SW_LIFTED;
+            Switch1 = 0;
             Debounce1 = STALE;
         }
     } else { // Switch touched
-        if (Switch1 == SW_TOUCHED) {
+        if (Switch1 > 0) {
             if (Debounce1 != STALE && millis() > Debounce1) {
                 Debounce1 = STALE;
                 switch1Action();
             }
-        } else if (Switch1 == SW_LIFTED) {
+        } else if (Switch1 == 0) {
             Serial.println("Switch1 landed");
             Debounce1 = millis() + 100;
-            Switch1 = SW_TOUCHED;
+            Switch1 = 1;
         }
     }
 
+    // Switch 2 has long debounce
     if (digitalRead(PIN_SW2) == 0) { // Switch lifted
-        if (Switch2 == SW_TOUCHED) {
+        if (Switch2 > 0) {
             Serial.println("Switch2 left");
-            Switch2 = SW_LIFTED;
+            Switch2 = 0;
             Debounce2 = STALE;
         }
     } else { // Switch touched
-        if (Switch2 == SW_TOUCHED) {
-            if (Debounce2 != STALE && millis() > Debounce2) {
-                Debounce2 = STALE;
-                switch2Action();
+        if (Switch2 > 0) {
+            if (Debounce2 != STALE) {
+                int bounce = bounceLong(Switch2, Debounce2);
+                if (bounce == 0) {
+                    switch2Action();
+                    Debounce2 = STALE;
+                } else if (bounce > 0) {
+                    Debounce2 = millis() + bounce;
+                    Switch2 ++;
+                } // else do nothing
             }
-        } else if (Switch2 == SW_LIFTED) {
+        } else {
             Serial.println("Switch2 landed");
-            Debounce2 = millis() + 100;
-            Switch2 = SW_TOUCHED;
+            Debounce2 = millis() + bounceLong(0, 0);
+            Switch2 = 1;
         }
     }
 
@@ -402,21 +448,20 @@ void loop() {
         }
         switch(message[3]) {
         case 'C':
-            if (message[4] >= '0' && message[4] <= '3') {
-                setCamera(message[4] - '0');
+            if (message[4] >= '0' && message[4] <= '1') {
+                setCamera(message[4] == '1' ? CAMERA_ON : CAMERA_OFF);
                 Serial1.print("KR:ok\n");
             } else {
                 Serial.println("Ignored");
             }
             break;
 
-        case 'B':
-            if (message[4] >= '0' && message[4] <= '9') {
-                float duty = 100.0 * (float)(message[4] - '0') / 9.0;
-                setBacklight(duty);
+        case 'L':
+            if (message[4] >= '0' && message[4] <= '1') {
+                setLight(message[4] - '0');
                 Serial1.print("KR:ok\n");
             } else {
-                Serial.println("Ignored");
+                setLight(-1);
             }
             break;
 
@@ -435,14 +480,15 @@ void loop() {
 
         case 'P':
             switch(message[4]) {
-            case 'S':
+            case 'S': case 'P':
                 isPrinting = true;
                 setBuzzer(BUZZ_START);
                 Serial1.print("KR:ok\n");
                 break;
                 
-            case 'E':
+            case 'E': case 'R':
                 isPrinting = false;
+                powerTimeout = 0;
                 setBuzzer(BUZZ_END);
                 Serial1.print("KR:ok\n");
                 break;
@@ -454,13 +500,11 @@ void loop() {
             break;
 
         case 'R':
-            if (message[4] == '1') {
-                isPowered = true;
-                setRelay(1);
+            if (message[4] == '1' || message[4] == '0') {
+                setRelay(message[4] - '0');
                 Serial1.print("KR:ok\n");
             } else {
-                isPowered = false;
-                setRelay(0);
+                setRelay(-1);
                 Serial1.print("KR:ok\n");
             }
             break;
@@ -480,8 +524,6 @@ void loop() {
         setRelay(0);
         Serial.println("Power off");
         powerTimeout = 0;
-        isPowered = false;
-        isPrinting = false;
     }
 
     if (wantOK && time(NULL) > responseTimeout) {
