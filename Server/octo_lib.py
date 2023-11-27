@@ -3,7 +3,7 @@
 # Common library for Octopus management
 
 import fcntl, os
-LOCK_FILE  = './octobox.lock'
+LOCK_FILE  = '/home/jay/Kingroon/Server/octobox.lock'
 
 def lock_lib():
    lock = open(LOCK_FILE, 'r+')
@@ -106,7 +106,7 @@ Rs = 0b00000001 # Register select bit
 class HD44780:
    #initializes objects and lcd
    def __init__(self):
-      self.lcd_device = i2c_lib.i2c_device(ADDRESS, 0)
+      self.lcd_device = i2c_device(ADDRESS, 0)
 
       self.lcd_write(0x03)
       self.lcd_write(0x03)
@@ -155,7 +155,7 @@ class HD44780:
       if line == 4:
          self.lcd_write(0xD4)
 
-      for char in string:
+      for char in string[:20]:
          self.lcd_write(ord(char), Rs)
 
    # clear lcd and set to home

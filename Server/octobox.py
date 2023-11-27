@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from octo_lib import HD44780, UART, lock_lib, free_lib
+from time import sleep
 import shutil
 
 lcd = HD44780()
@@ -25,10 +26,10 @@ device_name = list_devices[usb_device].strip()
 webcamPopen = ['/usr/local/bin/mjpg_streamer',
                '-i', f'"/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480"',
                '-o', '"/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www"']
-captureRun = ['/usr/bin/ffmpeg', '-f', 'v4l2', '-video_size', '1280x960', '-i', device_name,
-              '-frames', '1', '/usr/local/share/mjpg-streamer/www/capture.jpg']
+captureRun = ['/usr/bin/fswebcam', '-r', '1280x960', '-d', device_name, '--no-banner',
+              '--rotate', '180', '--jpeg', '95', '/var/www/html/capture.jpg']
 
-# ffmpeg -f v4l2 -video_size 1280x720 -i /dev/video0 -frames 1 out.jpg
+# fswebcam -d /dev/video3 -r 640x480 --no-banner --rotate 180 --jpeg 95 /var/www/html/capture.jpg
 # TODO: Run the webcam only when needed, replace with a still image when stopped
 webcam = None
         
@@ -43,25 +44,25 @@ tickTimeout = datetime.now() + timedelta(seconds=5)
 isPaused = False
 
 def sendOctoprint(data):
-    urlopen('localhost:5000/api/job', data)
+    urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', data)
 
 def doorOpen():
     if isPaused:
         sendOctoprint('{ "command": "pause", "action": "resume" }')
 
 def doorClosed():
-    if !isPaused:
+    if not isPaused:
         sendOctoprint('{ "command": "pause", "action": "pause" }')
 
 def startCamera():
     webcam = subprocess.Popen(webcamPopen)
-    shutil.copyfile('index_stream.html', 'index.html')
+    shutil.copyfile('/var/www/html/stream.html', '/var/www/html/index.html')
     sendUART('KR:C1')
 
 def stopCamera():
     webcam.terminate()
     subprocess.run(captureRun)
-    shutil.copyfile('index_still.html', 'index.html')
+    shutil.copyfile('/var/www/html/still.html', '/var/www/html/index.html')
     sendUART('KR:C0')
 
 def readUART():
@@ -87,26 +88,31 @@ def sendUART(command):
     UART.write((command + '\n').encode('utf-8'))
 
 def printTime(seconds):
-    return time(second=seconds).strftime('%HH:%MM')
+    return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
 def readOcto():
-    job = json.loads(urlopen('localhost:5000/api/job'))['job']
+    with urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0') as jobapi:
+        job = json.loads(jobapi.read())
 
-    state = job['state']
-    lcd.lcd_display_string(0, state)
+        state = job['state']
+        lcd.lcd_display_string(1, state)
 
-    fileName = job['job']['file']['name'].removesuffix('.gcode')
-    lcd.lcd_display_string(1, filename)
+        fileName = job['job']['file']['name']
+        if fileName is None:
+            lcd.lcd_display_string(2, "")
+        else:
+            fileName.removesuffix('.gcode')
+            lcd.lcd_display_string(2, fileName)
 
-    completion = job['progress']['completion']
-    fileEstimate = job['job']['estimatedPrintTime']
-    lcd.lcd_display_string(2, f'{completion:.1f}% of {printTime(fileEstimate)}')
-
-    currentTime = job['progress']['printTime']
-    remainingTime = job['progress']['printTimeLeft']
-    eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
-    eta_round = eta.replace(minute=0)
-    lcd.lcd_display_string(3, f'{printTime(currentTime)} ETA {eta_round.strftime("%HH:%MM")}')
+        completion = job['progress']['completion']
+        fileEstimate = job['job']['estimatedPrintTime']
+        currentTime = job['progress']['printTime']
+        remainingTime = job['progress']['printTimeLeft']
+        eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
+        eta_round = eta.replace(second=0)
+        
+        lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
+        lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")} ETA {eta_round.strftime("%H:%M")}')
 
 def readEvent():
     lock = lock_lib()
@@ -123,7 +129,7 @@ def readEvent():
                 stopCamera()
         sendUART(event)
             
-    lock.free_lib(lock, erase=True);
+    free_lib(lock, erase=True);
 
 while(True):
     readUART()

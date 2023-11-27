@@ -1,5 +1,5 @@
 [Unit]
-Description=Start mjpg_streamer
+Description=Octobox daemon
 After=network-online.target
 Wants=network-online.target
 
@@ -7,8 +7,8 @@ Wants=network-online.target
 Environment="LC_ALL=C.UTF-8"
 Environment="LANG=C.UTF-8"
 Type=exec
-User=octoprint
-ExecStart=/home/octoprint/Kingroon/Server/kingroon.py
+User=jay
+ExecStart=/home/jay/Kingroon/Server/octobox.py
 
 [Install]
 WantedBy=multi-user.target

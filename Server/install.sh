@@ -7,3 +7,4 @@ systemctl start octobox
 systemctl status octobox
 
 cp octo_*.py /home/octoprint/scripts/
+cp html/*.html /var/www/html/
