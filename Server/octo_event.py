@@ -4,9 +4,10 @@ from octo_lib import lock_lib, free_lib, sendUART
 from sys import argv as args
 
 action = args[1]
+
+lock = lock_lib()
 if action == 'Power':        # KR:RR Toggle relay
-    #TODO: on plugin tab
-    pass
+    sendUART('KR:RR')
 
 elif action == 'Start':      # KR:PS
     sendUART('KR:PS')
@@ -21,6 +22,4 @@ elif action == 'Pause':      # KR:PP
 elif action == 'Resume':     # KR:PR
     sendUART('KR:PR')
 
-lock = lock_lib()
-lock.write()
-lock.free_lib(lock, erase=False);
+free_lib(lock, erase=False);

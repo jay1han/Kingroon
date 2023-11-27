@@ -345,21 +345,25 @@ unsigned int ReedDebounce = STALE, Debounce1 = STALE, Debounce2 = STALE;
 // For each step and current debounce, return
 // 0 if STALE, negative to continue current bounce, positive debounce millseconds
 int bounceLong(int step, unsigned int debounce) {
-    switch(step) {
-    case 1: case 3: case 5:
-        setBuzzer(BUZZ_OFF);
-        return 600;
+    if (debounce == 0 || millis() > debounce) {
+        switch(step) {
+        case 1: case 3: case 5:
+            setBuzzer(BUZZ_OFF);
+            return 600;
 
-    case 0: case 2: case 4:
-        setBuzzer(BUZZ_ON);
-        return 100;
+        case 0: case 2: case 4:
+            setBuzzer(BUZZ_ON);
+            return 100;
 
-    case 6:
-        setBuzzer(BUZZ_ON);
-        return 1200;
+        case 6:
+            setBuzzer(BUZZ_ON);
+            return 1200;
 
-    default:
-        setBuzzer(BUZZ_OFF);
+        default:
+            setBuzzer(BUZZ_OFF);
+            return -1;
+        }
+    } else {
         return -1;
     }
 }

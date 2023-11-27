@@ -87,9 +87,6 @@ def readUART():
                 doorOpen()
             sendUART('KR:OK')
 
-def sendUART(command):
-    UART.write((command + '\n').encode('utf-8'))
-
 def printTime(seconds):
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 

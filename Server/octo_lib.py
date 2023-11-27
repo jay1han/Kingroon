@@ -169,3 +169,7 @@ class HD44780:
 
 import serial
 UART = serial.Serial('/dev/ttyS1', baudrate=9600, timeout=0)
+
+def sendUART(command):
+    UART.write((command + '\n').encode('utf-8'))
+
