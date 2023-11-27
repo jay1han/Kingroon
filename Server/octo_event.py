@@ -4,18 +4,22 @@ from octo_lib import lock_lib, free_lib
 from sys import argv as args
 
 action = args[1]
-if action == 'Power':        // KR:RR Toggle relay
+if action == 'Power':        # KR:RR Toggle relay
+    #TODO: on plugin tab
     pass
-elif action == 'Start':      // KR:PS 
-    pass
-elif action == 'End':        // KR:PE, KR:R0
-    pass
-elif action == 'Pause':      // KR:PP
-    pass
-elif action == 'Resume':     // KR:PR
-    pass
-elif action == 'Connecting': // KR:R1
-    pass
+
+elif action == 'Start':      # KR:PS
+    sendUART('KR:PS')
+
+elif action == 'End':        # KR:PE, KR:R0
+    sendUART('KR:PE')
+    sendUART('KR:R0')
+
+elif action == 'Pause':      # KR:PP
+    sendUART('KR:PP')
+
+elif action == 'Resume':     # KR:PR
+    sendUART('KR:PR')
 
 lock = lock_lib()
 lock.write()

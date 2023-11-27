@@ -1,7 +1,9 @@
 #!/usr/bin/bash
 
-cp webcam.service /etc/systemd/system/
+cp octobox.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl restart webcam
-systemctl status webcam
+systemctl enable octobox
+systemctl start octobox
+systemctl status octobox
 
+cp octo_*.py /home/octoprint/scripts/

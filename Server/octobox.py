@@ -42,6 +42,9 @@ import json
 tickTimeout = datetime.now() + timedelta(seconds=5)
 isPaused = False
 
+def sendOctoprint(data):
+    urlopen('localhost:5000/api/job', data)
+
 def doorOpen():
     if isPaused:
         sendOctoprint('{ "command": "pause", "action": "resume" }')
