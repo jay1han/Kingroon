@@ -461,7 +461,7 @@ void loop() {
                 setLight(message[4] - '0');
                 Serial1.print("KR:ok\n");
             } else {
-                Serial.println("Ignored");
+                setLight(-1);
             }
             break;
 
