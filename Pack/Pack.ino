@@ -129,10 +129,10 @@ void setLight(int setState) {
 
     if (setState >= 0) state = setState;
     else state = 1 - state;
-    Serial.printf("Light %s\n", state == 1 ? "on" : "off");
+    Serial.printf("Light %s\n", state == 0 ? "off" : "on");
     sendStrip(&Light, state * 255, state * 255, state * 255);
     Serial1.printf("KR:L%d\n", state);
-    setBacklight(state == 1 ? 100 : 10);
+    setBacklight(state == 1 ? 100 : (isPowered ? 30 : 10));
     setCamera(CAMERA_DARK + state);
 }
 
