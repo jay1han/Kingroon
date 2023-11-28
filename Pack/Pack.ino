@@ -511,6 +511,6 @@ void loop() {
     if (time(NULL) > heartbeatTimeout) {
         Serial1.printf("KR:R%d\n", isPowered ? 1 : 0);
         heartbeatTimeout = time(NULL) + 60;
-        Serial.println("Heartbeat");
+        Serial.printf("Heartbeat KR:R%d\n", isPowered ? 1 : 0);
     }
 }
