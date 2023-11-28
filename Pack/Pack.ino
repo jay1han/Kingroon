@@ -4,16 +4,19 @@
 #include <HardwareSerial.h>
 #include <driver/uart.h>
 
-#define PIN_SW2     0
-#define PIN_SW1     1
+#define PIN_RELAY   0
+#define PIN_SWITCH  1
+#define PIN_DOWN2   2
 #define PIN_REED    3
 #define PIN_LIGHT   4
+#define PIN_NC      5
 #define PIN_CAMERA  6
 #define PIN_LCD     7
+#define PIN_DOWN8   8
+#define PIN_BOOT    9
+#define PIN_BUZZER  10
 #define PI_RX       20
 #define PI_TX       21
-#define PIN_BUZZER  5
-#define PIN_RELAY   10
 
 #define LEDS_LIGHT  30
 #define LEDS_CAMERA 3
@@ -90,14 +93,13 @@ void sendStrip(Strip *strip, byte r, byte g, byte b) {
     Serial.println("Done");
 }
 
-bool wantOK = false;
 char ackMessage[8];
 time_t responseTimeout = 0;
 time_t heartbeatTimeout = 0;
 
 #define CAMERA_ON       0
-#define CAMERA_BRIGHT   1
-#define CAMERA_DARK     2
+#define CAMERA_DARK     1
+#define CAMERA_BRIGHT   2
 #define CAMERA_OFF      3
 
 void setCamera(int setMode) {
@@ -106,8 +108,8 @@ void setCamera(int setMode) {
 
     switch (setMode) {
     case CAMERA_ON:     isHigh = true; break;
-    case CAMERA_BRIGHT: isLight = true; break;
     case CAMERA_DARK:   isLight = false; break;
+    case CAMERA_BRIGHT: isLight = true; break;
     case CAMERA_OFF:    isHigh = false; break;
     }
 
@@ -268,7 +270,6 @@ void doorOpen() {
     Serial.println("Door open");
     strcpy(ackMessage, "KR:DO\n");
     Serial1.print(ackMessage);
-    wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(1);
     if (powerTimeout > 0) {
@@ -282,7 +283,6 @@ void doorClosed() {
     Serial.println("Door closed");
     strcpy(ackMessage, "KR:DC\n");
     Serial1.print(ackMessage);
-    wantOK = true;
     responseTimeout = time(NULL) + 5;
     setLight(0);
     
@@ -298,11 +298,11 @@ void doorClosed() {
     }
 }
 
-void switch1Action() {
+void switchShort() {
     setLight(-1);
 }
 
-void switch2Action() {
+void switchLong() {
     setRelay(-1);
 }
 
@@ -312,12 +312,14 @@ void setup() {
     delay(2000);
     Serial.println("START");
 
-    initStrip(&Light, PIN_LIGHT, LEDS_LIGHT);
+    initStrip(&Light,  PIN_LIGHT,  LEDS_LIGHT);
     initStrip(&Camera, PIN_CAMERA, LEDS_CAMERA);
 
+    pinMode(PIN_NC,     INPUT);
+    pinMode(PIN_DOWN2,  INPUT_PULLDOWN);
+    pinMode(PIN_DOWN8,  INPUT_PULLDOWN);
     pinMode(PIN_REED,   INPUT_PULLUP);
-    pinMode(PIN_SW1,    INPUT);
-    pinMode(PIN_SW2,    INPUT);
+    pinMode(PIN_SWITCH, INPUT);
     pinMode(PIN_LCD,    OUTPUT);
     pinMode(PIN_BUZZER, OUTPUT);
     pinMode(PIN_RELAY,  OUTPUT);
@@ -340,8 +342,8 @@ void setup() {
 #define DOOR_CLOSED   0
 #define STALE         0
 
-int Reed = DOOR_OPEN, Switch1 = 0, Switch2 = 0;
-unsigned int ReedDebounce = STALE, Debounce1 = STALE, Debounce2 = STALE;
+int Reed = DOOR_OPEN, Switch = 0;
+unsigned int ReedDebounce = STALE, Debounce = STALE;
 
 // For each step and current debounce, return
 // 0 if STALE, negative to continue current bounce, positive debounce millseconds
@@ -350,15 +352,15 @@ int bounceLong(int step, unsigned int debounce) {
         switch(step) {
         case 1: case 3: case 5:
             setBuzzer(BUZZ_OFF);
-            return 600;
+            return 500;
 
         case 0: case 2: case 4:
             setBuzzer(BUZZ_ON);
-            return 100;
+            return 150;
 
         case 6:
             setBuzzer(BUZZ_ON);
-            return 1200;
+            return 1000;
 
         default:
             setBuzzer(BUZZ_OFF);
@@ -395,50 +397,35 @@ void loop() {
         }
     }
 
-    // Debounce switches only when touched
-    if (digitalRead(PIN_SW1) == 0) { // Switch lifted
-        if (Switch1 > 0) {
-            Serial.println("Switch1 left");
-            Switch1 = 0;
-            Debounce1 = STALE;
-        }
-    } else { // Switch touched
-        if (Switch1 > 0) {
-            if (Debounce1 != STALE && millis() > Debounce1) {
-                Debounce1 = STALE;
-                switch1Action();
-            }
-        } else if (Switch1 == 0) {
-            Serial.println("Switch1 landed");
-            Debounce1 = millis() + 100;
-            Switch1 = 1;
-        }
-    }
-
-    // Switch 2 has long debounce
-    if (digitalRead(PIN_SW2) == 0) { // Switch lifted
-        if (Switch2 > 0) {
-            Serial.println("Switch2 left");
-            Switch2 = 0;
-            Debounce2 = STALE;
+    // Debounce switch
+    if (digitalRead(PIN_SWITCH) == 0) { // Switch lifted
+        if (Switch > 0) {
             setBuzzer(BUZZ_OFF);
+            if (Switch <= 2) {
+                Serial.println("Short touch");
+                switchShort();
+            } else {
+                Serial.println("Switch clear");
+            }
+            Switch = 0;
+            Debounce = STALE;
         }
     } else { // Switch touched
-        if (Switch2 > 0) {
-            if (Debounce2 != STALE) {
-                int bounce = bounceLong(Switch2, Debounce2);
+        if (Switch > 0) {
+            if (Debounce != STALE) {
+                int bounce = bounceLong(Switch, Debounce);
                 if (bounce == 0) {
-                    switch2Action();
-                    Debounce2 = STALE;
+                    switchLong();
+                    Debounce = STALE;
                 } else if (bounce > 0) {
-                    Debounce2 = millis() + bounce;
-                    Switch2 ++;
-                } // else do nothing
+                    Debounce = millis() + bounce;
+                    Switch ++;
+                } // else wait
             }
         } else {
-            Serial.println("Switch2 landed");
-            Debounce2 = millis() + bounceLong(0, 0);
-            Switch2 = 1;
+            Serial.println("Switch landed");
+            Debounce = millis() + bounceLong(0, 0);
+            Switch = 1;
         }
     }
 
@@ -453,30 +440,12 @@ void loop() {
             continue;
         }
         switch(message[3]) {
-        case 'C':
-            if (message[4] >= '0' && message[4] <= '1') {
-                setCamera(message[4] == '1' ? CAMERA_ON : CAMERA_OFF);
-                Serial1.print("KR:ok\n");
-            } else {
-                Serial.println("Ignored");
-            }
-            break;
-
-        case 'L':
-            if (message[4] >= '0' && message[4] <= '1') {
-                setLight(message[4] - '0');
-                Serial1.print("KR:ok\n");
-            } else {
-                setLight(-1);
-            }
-            break;
-
         case 'O':
             if (message[4] == 'K') {
                 Serial.println("Received OK");
-                if (wantOK) {
+                if (responseTimeout > 0) {
                     Serial.println("Clear wantOK");
-                    wantOK = false;
+                    responseTimeout = 0;
                 }
                 Serial1.print("KR:ok\n");
             } else {
@@ -486,14 +455,16 @@ void loop() {
 
         case 'P':
             switch(message[4]) {
-            case 'S': case 'P':
+            case 'S': case 'R':
                 isPrinting = true;
+                setCamera(CAMERA_ON);
                 setBuzzer(BUZZ_START);
                 Serial1.print("KR:ok\n");
                 break;
                 
-            case 'E': case 'R':
+            case 'E': case 'P':
                 isPrinting = false;
+                setCamera(CAMERA_OFF);
                 powerTimeout = 0;
                 setBuzzer(BUZZ_END);
                 Serial1.print("KR:ok\n");
@@ -515,11 +486,6 @@ void loop() {
             }
             break;
 
-        case 'A':
-            setBuzzer(message[4] - '0');
-            Serial1.print("KR:ok\n");
-            break;
-
         default:
             Serial.println("Ignored");
             break;
@@ -532,7 +498,7 @@ void loop() {
         powerTimeout = 0;
     }
 
-    if (wantOK && time(NULL) > responseTimeout) {
+    if (responseTimeout > 0 && time(NULL) > responseTimeout) {
         Serial.printf("Resend \"%s\"\n", ackMessage);
         Serial1.print(ackMessage);
         responseTimeout = time(NULL) + 5;
@@ -547,6 +513,4 @@ void loop() {
         heartbeatTimeout = time(NULL) + 60;
         Serial.println("Heartbeat");
     }
-
-    delay(10);
 }
