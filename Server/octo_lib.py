@@ -3,7 +3,7 @@
 # Common library for Octopus management
 
 import fcntl, os
-LOCK_FILE  = '/home/octoprint/scripts/octobox.lock'
+LOCK_FILE  = '/usr/share/octobox/octobox.lock'
 
 def lock_lib():
    lock = open(LOCK_FILE, 'r+')

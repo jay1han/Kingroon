@@ -1,8 +1,7 @@
 #!/usr/bin/python3
 
-from octo_lib import HD44780, UART, lock_lib, free_lib
+from octo_lib import HD44780, UART, lock_lib, free_lib, sendUART
 from time import sleep
-import shutil
 
 lcd = HD44780()
 lcd.lcd_clear()
@@ -12,6 +11,33 @@ lcd.lcd_display_string(1, "Octobox")
 # Get the webcam
 
 import subprocess, re
+
+list_if = subprocess.run(['/usr/bin/ip', 'addr'], capture_output=True, text=True).stdout
+match = re.search('inet 192\.168\.([.0-9]+)', list_if, flags=re.MULTILINE)
+if match is not None:
+    my_ip = f'192.168.{match.group(1)}'
+else:
+    my_ip = 'localhost'
+
+isPowered = False
+def writeIndex():
+    if isPowered:
+        statusText  = 'Printer Ready'
+        buttonLabel = 'Power off'
+    else:
+        statusText  = 'Printer Off'
+        buttonLabel = 'Power on'
+        
+    with open('/home/jay/Kingroon/Server/index.html') as source:
+        html = source.read()
+    with open('/var/www/html/index.html', 'w+') as target:
+        target.write(html\
+                     .replace('{localIP}', my_ip)\
+                     .replace('{statusText}', statusText)\
+                     .replace('{buttonLabel}', buttonLabel)\
+                     )
+
+writeIndex()
 
 list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'], capture_output=True, text=True).stdout.splitlines()
 
@@ -26,7 +52,6 @@ device_name = list_devices[usb_device].strip()
 webcamPopen = ['/usr/local/bin/mjpg_streamer',
                '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480',
                '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
-# /usr/local/bin/mjpg_streamer -i "/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480" -o "/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www"
 
 webcam = subprocess.Popen(webcamPopen)
 print(f'Started webcam process {webcam.pid}')
@@ -65,8 +90,10 @@ def stopCamera():
     sendUART('KR:C0')
 
 def readUART():
-    command = UART.readline()
+    command = UART.readline().decode(errors='ignore')
     if command[:3] == 'KR:':
+        print(command)
+        
         if command[3:5] == 'OK':
             sendUART('KR:OK')
 
@@ -74,6 +101,12 @@ def readUART():
             sendUART('KR:OK')
             
         elif command[3] == 'R':
+            global isPowered
+            if command[4] == '1':
+                isPowered = True
+            else:
+                isPowered = False
+            writeIndex()
             sendUART('KR:OK')
             
         elif command[3] == 'D':
@@ -127,6 +160,7 @@ def readEvent():
     event = lock.read().strip()
     if event[:3] == 'KR:':
         print(event)
+        sendUART(event)
         lcd.lcd_display_string(2, event)
         if event[3] == 'P':
             if event[4] == 'P':
@@ -137,6 +171,9 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
+                sendUART('KR:R0')
+                global isPowered
+                isPowered = False
             
     free_lib(lock, erase=True);
 

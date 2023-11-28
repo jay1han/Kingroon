@@ -4,7 +4,11 @@
   </head>
   <body>
     <center>
-      <img style="transform: rotate(180deg);" src="http://localhost:8080/?action=stream" />
+      <h1>{statusText}</h1>
+      <form action="/bin/octocgi.py">
+        <button type="submit">{buttonLabel}</button>
+      </form>
+      <img style="transform: rotate(180deg);" src="http://{localIP}:8080/?action=stream" />
     </center>
   </body>
 </html>
