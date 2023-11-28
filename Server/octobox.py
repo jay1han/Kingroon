@@ -69,7 +69,7 @@ isPaused = False
 
 def sendOctoprint(data):
     try:
-        urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', data)
+        urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', bytes(data, 'ascii'))
     except OSError:
         pass
 
