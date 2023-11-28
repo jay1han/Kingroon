@@ -334,7 +334,7 @@ void setup() {
     setBuzzer(BUZZ_BOOT);
 
     Serial1.begin(9600, SERIAL_8N1, PI_RX, PI_TX);
-    Serial1.print("\n\n\nKR:OK\n");
+    Serial1.print("\n\n\nKR:R0\n");
     heartbeatTimeout = time(NULL) + 60;
 }
 
@@ -509,7 +509,7 @@ void loop() {
     }
 
     if (time(NULL) > heartbeatTimeout) {
-        Serial1.print("KR:OK\n");
+        Serial1.printf("KR:R%d\n", isPowered ? 1 : 0);
         heartbeatTimeout = time(NULL) + 60;
         Serial.println("Heartbeat");
     }
