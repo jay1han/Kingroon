@@ -1,7 +1,7 @@
 [Unit]
 Description=Octobox daemon
 After=network-online.target
-Wants=network-online.target
+Wants=octoprint.service
 
 [Service]
 Environment="LC_ALL=C.UTF-8"

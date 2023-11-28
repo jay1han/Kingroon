@@ -6,8 +6,8 @@ from sys import argv as args
 action = args[1]
 
 lock = lock_lib()
-if action == 'Power':        # KR:RR Toggle relay
-    sendUART('KR:RR')
+if action == 'Connect':   # KR:R1 start printer
+    sendUART('KR:R1')
 
 elif action == 'Start':      # KR:PS
     lock.write('KR:PS\n')

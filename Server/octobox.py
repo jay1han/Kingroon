@@ -6,7 +6,7 @@ import shutil
 
 lcd = HD44780()
 lcd.lcd_clear()
-lcd.lcd_display_string(1, "Hello")
+lcd.lcd_display_string(1, "Octobox")
 
 #################################################################
 # Get the webcam
@@ -24,14 +24,13 @@ for line in list_devices:
 
 device_name = list_devices[usb_device].strip()
 webcamPopen = ['/usr/local/bin/mjpg_streamer',
-               '-i', f'"/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480"',
-               '-o', '"/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www"']
-captureRun = ['/usr/bin/fswebcam', '-r', '1280x960', '-d', device_name, '--no-banner',
-              '--rotate', '180', '--jpeg', '95', '/var/www/html/capture.jpg']
+               '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480',
+               '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
+# /usr/local/bin/mjpg_streamer -i "/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480" -o "/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www"
 
-# fswebcam -d /dev/video3 -r 640x480 --no-banner --rotate 180 --jpeg 95 /var/www/html/capture.jpg
-# TODO: Run the webcam only when needed, replace with a still image when stopped
-webcam = None
+webcam = subprocess.Popen(webcamPopen)
+print(f'Started webcam process {webcam.pid}')
+lcd.lcd_display_string(2, "Webcam started")
         
 #################################################################
 # Monitor the UART, Octoprint info and events --> update the display
@@ -60,16 +59,9 @@ def doorClosed():
         sendOctoprint('{ "command": "pause", "action": "pause" }')
 
 def startCamera():
-    webcam = subprocess.Popen(webcamPopen)
-    shutil.copyfile('/var/www/html/stream.html', '/var/www/html/index.html')
-    print(f'Started webcam process {webcam.pid}')
     sendUART('KR:C1')
 
 def stopCamera():
-    print(f'Stopping webcam process {webcam.pid}')
-    webcam.terminate()
-    subprocess.run(captureRun)
-    shutil.copyfile('/var/www/html/still.html', '/var/www/html/index.html')
     sendUART('KR:C0')
 
 def readUART():
@@ -110,12 +102,15 @@ def readOcto():
                 lcd.lcd_display_string(2, fileName)
 
             completion = job['progress']['completion']
-            if completion is None: completion = 0
             fileEstimate = job['job']['estimatedPrintTime']
-            if fileEstimate is None: fileEstimate = 0
             currentTime = job['progress']['printTime']
+            if completion is None: completion = 0
+            if fileEstimate is None: fileEstimate = 0
             if currentTime is None: currentTime = 0
-            lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
+            if completion != 0 or fileEstimate != 0 or currentTime != 0:
+                lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
+            else:
+                lcd.lcd_display_string(3, 'No print job')
 
             remainingTime = job['progress']['printTimeLeft']
             if remainingTime is not None and remainingTime > 0:
@@ -125,13 +120,14 @@ def readOcto():
             else:
                 lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
     except OSError:
-        pass
+        lcd.lcd_display_string(1, 'Server not running')
 
 def readEvent():
     lock = lock_lib()
     event = lock.read().strip()
     if event[:3] == 'KR:':
         print(event)
+        lcd.lcd_display_string(2, event)
         if event[3] == 'P':
             if event[4] == 'P':
                 isPaused = True
