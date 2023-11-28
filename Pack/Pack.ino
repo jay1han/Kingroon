@@ -6,13 +6,13 @@
 
 #define PIN_RELAY   0
 #define PIN_SWITCH  1
-#define PIN_DOWN2   2
+#define PIN_UP2     2
 #define PIN_REED    3
 #define PIN_LIGHT   4
 #define PIN_NC      5
 #define PIN_CAMERA  6
 #define PIN_LCD     7
-#define PIN_DOWN8   8
+#define PIN_UP8     8
 #define PIN_BOOT    9
 #define PIN_BUZZER  10
 #define PI_RX       20
@@ -143,30 +143,6 @@ void setBacklight(float duty) {
     analogWrite(PIN_LCD, value);
 }
 
-int setRelay(int command) {
-    static int state;
-    
-    Serial.printf("Relay command %d, state %d", command, state);
-    if (command < 0) state = 1 - state;
-    else state = command;
-    Serial.printf(" -> %d\n", state);
-
-    if (state == 1 && !isDoorOpen) {
-        setBuzzer(BUZZ_DOOR);
-        state = 0;
-        digitalWrite(PIN_RELAY, 0);
-        return -1;
-    }
-
-    if (state == 1) digitalWrite(PIN_RELAY, 1);
-    else digitalWrite(PIN_RELAY, 0);
-    Serial1.printf("KR:R%d\n", state);
-    
-    isPowered = state;
-    if (!isPowered) isPrinting = false;
-    return state;
-}
-
 #define BUZZ_OFF      0
 #define BUZZ_START    1
 #define BUZZ_END      2
@@ -275,6 +251,30 @@ void setBuzzer(int tone) {
     cycle ++;
 }
 
+int setRelay(int command) {
+    static int state;
+    
+    Serial.printf("Relay command %d, state %d", command, state);
+    if (command < 0) state = 1 - state;
+    else state = command;
+    Serial.printf(" -> %d\n", state);
+
+    if (state == 1 && !isDoorOpen) {
+        setBuzzer(BUZZ_DOOR);
+        state = 0;
+        digitalWrite(PIN_RELAY, 0);
+        return -1;
+    }
+
+    if (state == 1) digitalWrite(PIN_RELAY, 1);
+    else digitalWrite(PIN_RELAY, 0);
+    Serial1.printf("KR:R%d\n", state);
+    
+    isPowered = state;
+    if (!isPowered) isPrinting = false;
+    return state;
+}
+
 void doorOpen() {
     isDoorOpen = true;
     Serial.println("Door open");
@@ -327,8 +327,8 @@ void setup() {
     initStrip(&Camera, PIN_CAMERA, LEDS_CAMERA);
 
     pinMode(PIN_NC,     INPUT);
-    pinMode(PIN_DOWN2,  INPUT_PULLDOWN);
-    pinMode(PIN_DOWN8,  INPUT_PULLDOWN);
+    pinMode(PIN_UP2,    INPUT_PULLUP);
+    pinMode(PIN_UP8,    INPUT_PULLUP);
     pinMode(PIN_REED,   INPUT_PULLUP);
     pinMode(PIN_SWITCH, INPUT);
     pinMode(PIN_LCD,    OUTPUT);
