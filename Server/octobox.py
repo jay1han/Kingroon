@@ -131,7 +131,7 @@ def readOcto():
             if fileName is None:
                 lcd.lcd_display_string(2, "")
             else:
-                fileName.removesuffix('.gcode')
+                fileName = fileName.removesuffix('.gcode')
                 lcd.lcd_display_string(2, fileName)
 
             completion = job['progress']['completion']
