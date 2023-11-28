@@ -129,10 +129,10 @@ void setLight(int setState) {
 
     if (setState >= 0) state = setState;
     else state = 1 - state;
-    Serial.printf("Light %s\n", state == 1 ? "on" : "off");
+    Serial.printf("Light %s\n", state == 0 ? "off" : "on");
     sendStrip(&Light, state * 255, state * 255, state * 255);
     Serial1.printf("KR:L%d\n", state);
-    setBacklight(state == 1 ? 100 : 10);
+    setBacklight(state == 1 ? 100 : (isPowered ? 30 : 10));
     setCamera(CAMERA_DARK + state);
 }
 
@@ -334,7 +334,7 @@ void setup() {
     setBuzzer(BUZZ_BOOT);
 
     Serial1.begin(9600, SERIAL_8N1, PI_RX, PI_TX);
-    Serial1.print("\n\n\nKR:OK\n");
+    Serial1.print("\n\n\nKR:R0\n");
     heartbeatTimeout = time(NULL) + 60;
 }
 
@@ -509,7 +509,7 @@ void loop() {
     }
 
     if (time(NULL) > heartbeatTimeout) {
-        Serial1.print("KR:OK\n");
+        Serial1.printf("KR:R%d\n", isPowered ? 1 : 0);
         heartbeatTimeout = time(NULL) + 60;
         Serial.println("Heartbeat");
     }
