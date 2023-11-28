@@ -23,6 +23,7 @@
 
 bool isPrinting = false;
 bool isPowered = false;
+bool isDoorOpen = true;
 time_t powerTimeout = 0;
 time_t buzzerCycle = 0;
 
@@ -142,7 +143,7 @@ void setBacklight(float duty) {
     analogWrite(PIN_LCD, value);
 }
 
-void setRelay(int command) {
+int setRelay(int command) {
     static int state;
     
     Serial.printf("Relay command %d, state %d", command, state);
@@ -150,12 +151,20 @@ void setRelay(int command) {
     else state = command;
     Serial.printf(" -> %d\n", state);
 
+    if (state == 1 && !isDoorOpen) {
+        setBuzzer(BUZZ_DOOR);
+        state = 0;
+        digitalWrite(PIN_RELAY, 0);
+        return -1;
+    }
+
     if (state == 1) digitalWrite(PIN_RELAY, 1);
     else digitalWrite(PIN_RELAY, 0);
     Serial1.printf("KR:R%d\n", state);
     
     isPowered = state;
     if (!isPowered) isPrinting = false;
+    return state;
 }
 
 #define BUZZ_OFF      0
@@ -243,7 +252,7 @@ void setBuzzer(int tone) {
         }
         break;
 
-    case BUZZ_NOTICE: // Door closed while powered: short beeps forever
+    case BUZZ_NOTICE: // Door closed while powered: long beeps forever
         if (cycle % 2 == 0) {
             analogWrite(PIN_BUZZER, 255);
             buzzerTimer = millis() + 500;
@@ -267,6 +276,7 @@ void setBuzzer(int tone) {
 }
 
 void doorOpen() {
+    isDoorOpen = true;
     Serial.println("Door open");
     strcpy(ackMessage, "KR:DO\n");
     Serial1.print(ackMessage);
@@ -280,6 +290,7 @@ void doorOpen() {
 }
 
 void doorClosed() {
+    isDoorOpen = false;
     Serial.println("Door closed");
     strcpy(ackMessage, "KR:DC\n");
     Serial1.print(ackMessage);
@@ -477,12 +488,24 @@ void loop() {
             break;
 
         case 'R':
-            if (message[4] == '1' || message[4] == '0') {
-                setRelay(message[4] - '0');
+            if (message[4] == '1') {
+                if (isDoorOpen) {
+                    setBuzzer(BUZZ_DOOR);
+                    Serial1.print("KR:R0\n");
+                } else {
+                    setRelay(1);
+                    Serial1.print("KR:ok\n");
+                }
+            } else if (message[4] == '0') {
+                setRelay(0);
+                setBuzzer(BUZZ_OFF);
                 Serial1.print("KR:ok\n");
             } else {
-                setRelay(-1);
-                Serial1.print("KR:ok\n");
+                if (setRelay(-1) == -1) {
+                    Serial1.print("KR:R0\n");
+                } else {
+                    Serial1.print("KR:ok\n");
+                }
             }
             break;
 
@@ -494,6 +517,7 @@ void loop() {
 
     if (powerTimeout > 0 && time(NULL) > powerTimeout) {
         setRelay(0);
+        setBuzzer(BUZZ_OFF);
         Serial.println("Power off");
         powerTimeout = 0;
     }
