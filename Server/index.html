@@ -1,7 +1,60 @@
 <html>
   <head>
+    <script>
+      
+      function checkPage() {
+          const DayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+          const MonthName = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      
+          let refreshPromise = new Promise(
+              function(result, reject) {
+                  // This is really painful...
+                  // If-Modified-Since: <day-name>, <day> <month-name> <year> <hour>:<minute>:<second> GMT
+                  let docLastModifDate = new Date(document.lastModified);
+                  let docRequestedDate = new Date(docLastModifDate.getTime() + 1000)
+                  let docRequestedHTTPString =
+                      DayOfWeek[docRequestedDate.getUTCDay()] + ", " +
+                      docRequestedDate.getUTCDate().toString().padStart(2, "0") + " " +
+                      MonthName[docRequestedDate.getUTCMonth()] + " " +
+                      docRequestedDate.getUTCFullYear().toString() + " " +
+                      docRequestedDate.getUTCHours().toString().padStart(2, "0") + ":" +
+                      docRequestedDate.getUTCMinutes().toString().padStart(2, "0") + ":" +
+                      docRequestedDate.getUTCSeconds().toString().padStart(2, "0") + " GMT";
+                  
+                  var http = new XMLHttpRequest();
+                  http.open("HEAD", document.URL);
+                  http.setRequestHeader("If-Modified-Since", docRequestedHTTPString);
+                  http.onreadystatechange = function() {
+                      if (this.readyState == this.DONE) {
+                          result(this.status);
+                      }
+                  }
+                  http.send();
+              }
+          );
+          
+          refreshPromise.then(
+              function(status) {
+                  if (status == 200) {
+                      location.reload(true);
+                  } else {
+                      setupPromise();
+                  }
+              }
+          );
+      }
+
+      function setupPromise() {
+          setTimeout(checkPage, 1000);
+      }
+
+      window.addEventListener("load", setupPromise);
+            
+    </script>
+    
     <title>Kingroon Live</title>
   </head>
+  
   <body>
     <center>
       <h1>{statusText}</h1>

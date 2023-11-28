@@ -28,7 +28,7 @@ def writeIndex():
         statusText  = 'Printer Off'
         buttonLabel = 'Power on'
         
-    with open('/home/jay/Kingroon/Server/index.html') as source:
+    with open('/usr/share/octobox/index.html') as source:
         html = source.read()
     with open('/var/www/html/index.html', 'w+') as target:
         target.write(html\

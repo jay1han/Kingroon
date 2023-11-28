@@ -2,7 +2,7 @@
 
 mkdir /usr/share/octobox
 chmod a+w /usr/share/octobox
-cp octo_*.py /usr/share/octobox/
+cp octo*.py index.html /usr/share/octobox/
 touch /usr/share/octobox/octobox.lock
 chown -R octoprint:octoprint /usr/share/octobox
 chmod -R g+w /usr/share/octobox
