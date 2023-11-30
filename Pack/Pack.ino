@@ -498,7 +498,7 @@ void loop() {
                 }
             } else if (message[4] == '0') {
                 setRelay(0);
-                setBuzzer(BUZZ_OFF);
+                setBuzzer(BUZZ_END);
                 Serial1.print("KR:ok\n");
             } else {
                 if (setRelay(-1) == -1) {
