@@ -155,6 +155,8 @@ def readOcto():
     except OSError:
         lcd.lcd_display_string(1, 'Server not running')
 
+powerTimeout = None
+
 def readEvent():
     lock = lock_lib()
     event = lock.read().strip()
@@ -171,9 +173,8 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
-                sendUART('KR:R0')
-                global isPowered
-                isPowered = False
+                global powerTimeout
+                powerTimeout = datetime.now() + timedelta(seconds=60)
             
     free_lib(lock, erase=True);
 
@@ -181,4 +182,9 @@ while(True):
     readUART()
     readOcto()
     readEvent()
+    if powerTimeout is not None and datetime.now() > powerTimeout:
+        powerTimeout = None
+        sendUART('KR:R0')
+        isPowered = False
+        
     sleep(1)
