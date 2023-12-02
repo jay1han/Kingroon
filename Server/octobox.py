@@ -83,6 +83,9 @@ def doorClosed():
         print('Door closed: Pause');
         sendOctoprint('{ "command": "pause", "action": "pause" }')
 
+def sendDisconnect():
+    sendOctoprint('{ "command": "disconnect" }')
+
 def startCamera():
     sendUART('KR:C1')
 
@@ -158,6 +161,7 @@ def readOcto():
 powerTimeout = None
 
 def readEvent():
+    global powerTimeout
     lock = lock_lib()
     event = lock.read().strip()
     if event[:3] == 'KR:':
@@ -165,6 +169,7 @@ def readEvent():
         sendUART(event)
         lcd.lcd_display_string(2, event)
         if event[3] == 'P':
+            powerTimeout = None
             if event[4] == 'P':
                 isPaused = True
             elif event[4] == 'R':
@@ -173,8 +178,10 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
-                global powerTimeout
-                powerTimeout = datetime.now() + timedelta(minutes=5)
+                sendDisconnect()
+                powerTimeout = datetime.now() + timedelta(minutes=10)
+        if event[3] == 'R':
+            powerTimeout = None
             
     free_lib(lock, erase=True);
 

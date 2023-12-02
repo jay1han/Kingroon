@@ -6,7 +6,10 @@ from sys import argv as args
 action = args[1]
 
 lock = lock_lib()
-if action == 'Start':      # KR:PS
+if action == 'Connect':      # KR:R1 keep power on
+    lock.write('KR:R1\n')
+
+elif action == 'Start':      # KR:PS
     lock.write('KR:PS\n')
 
 elif action == 'End':        # KR:PE, KR:R0
