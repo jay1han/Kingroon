@@ -174,7 +174,7 @@ def readEvent():
             elif event[4] == 'E':
                 stopCamera()
                 global powerTimeout
-                powerTimeout = datetime.now() + timedelta(seconds=60)
+                powerTimeout = datetime.now() + timedelta(minutes=5)
             
     free_lib(lock, erase=True);
 
