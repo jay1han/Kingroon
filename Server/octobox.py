@@ -166,9 +166,10 @@ def readOcto():
         lcd.lcd_display_string(1, 'Server not running')
 
 powerTimeout = None
+discTimeout  = None
 
 def readEvent():
-    global powerTimeout
+    global powerTimeout, discTimeout
     lock = lock_lib()
     event = lock.read().strip()
     if event[:3] == 'KR:':
@@ -177,6 +178,7 @@ def readEvent():
         lcd.lcd_display_string(2, event)
         if event[3] == 'P':
             powerTimeout = None
+            discTimeout = None
             if event[4] == 'P':
                 isPaused = True
             elif event[4] == 'R':
@@ -185,10 +187,10 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
-                sendDisconnect()
-                powerTimeout = datetime.now() + timedelta(minutes=5)
+                discTimeout = datetime.now() + timedelta(seconds=60)
         if event[3] == 'R':
             powerTimeout = None
+            discTimeout  = None
             if event[4] == '1':
                 startCamera()
             elif event[4] == '0':
@@ -200,6 +202,11 @@ while(True):
     readUART()
     readOcto()
     readEvent()
+    if discTimeout is not None and datetime.now() > discTimeout:
+        discTimeout = None
+        sendDisconnect()
+        powerTimeout = datetime.now() + timedelta(minutes=5)
+        
     if powerTimeout is not None and datetime.now() > powerTimeout:
         powerTimeout = None
         sendUART('KR:R0')
