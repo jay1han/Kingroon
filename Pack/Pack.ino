@@ -102,6 +102,7 @@ time_t heartbeatTimeout = 0;
 #define CAMERA_DARK     1
 #define CAMERA_BRIGHT   2
 #define CAMERA_OFF      3
+#define CAMERA_TOGGLE   4
 
 void setCamera(int setMode) {
     static bool isHigh  = true;
@@ -112,6 +113,7 @@ void setCamera(int setMode) {
     case CAMERA_DARK:   isLight = false; break;
     case CAMERA_BRIGHT: isLight = true; break;
     case CAMERA_OFF:    isHigh = false; break;
+    case CAMERA_TOGGLE: isHigh = !isHigh; break;
     }
 
     int brightness;
@@ -483,6 +485,25 @@ void loop() {
                 
             default:
                 Serial.println("Ignored");
+                break;
+            }
+            break;
+
+        case 'C':
+            switch(message[4]) {
+            case '0':
+                setCamera(CAMERA_OFF);
+                Serial1.print("KR:ok\n");
+                break;
+                
+            case '1':
+                setCamera(CAMERA_ON);
+                Serial1.print("KR:ok\n");
+                break;
+
+            default:
+                setCamera(CAMERA_TOGGLE);
+                Serial1.print("KR:ok\n");
                 break;
             }
             break;
