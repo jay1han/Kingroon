@@ -59,7 +59,8 @@
     <center>
       <h1>{statusText}</h1>
       <form action="/bin/octocgi.py">
-        <button type="submit">{buttonLabel}</button>
+        <button type="submit" name="action" value="switch">{switchButton}</button>
+        <button type="submit" name="action" value="light">Light</button>
       </form>
       <img style="transform: rotate(180deg);" src="http://{localIP}:8080/?action=stream" />
     </center>

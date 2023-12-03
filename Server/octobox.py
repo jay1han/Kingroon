@@ -23,10 +23,10 @@ isPowered = False
 def writeIndex():
     if isPowered:
         statusText  = 'Printer Ready'
-        buttonLabel = 'Power off'
+        switchButton = 'Power off'
     else:
         statusText  = 'Printer Off'
-        buttonLabel = 'Power on'
+        switchButton = 'Power on'
         
     with open('/usr/share/octobox/index.html') as source:
         html = source.read()
@@ -34,7 +34,7 @@ def writeIndex():
         target.write(html\
                      .replace('{localIP}', my_ip)\
                      .replace('{statusText}', statusText)\
-                     .replace('{buttonLabel}', buttonLabel)\
+                     .replace('{switchButton}', switchButton)\
                      )
 
 writeIndex()
@@ -61,30 +61,37 @@ lcd.lcd_display_string(2, "Webcam started")
 # Monitor the UART, Octoprint info and events --> update the display
 
 from datetime import time, datetime, timedelta
-from urllib.request import urlopen
+from urllib.request import urlopen, Request
 import json
+APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
 
 tickTimeout = datetime.now() + timedelta(seconds=5)
 isPaused = False
 
-def sendOctoprint(data):
+def sendOctoprint(command, data):
+    request = Request(f'http://localhost:5000/api/{command}',
+                      headers = { 'X-Api-Key': APIKEY,
+                                  'Content-Type': 'application/json'
+                                  }
+                      )
+                                  
     try:
-        urlopen('http://localhost:5000/api/job?apikey=D613EB0DBA174390A1B03FCDC16E7BA0', bytes(data, 'ascii'))
+        urlopen(request, bytes(data, 'ascii'))
     except OSError:
         pass
 
 def doorOpen():
     if isPaused:
         print('Door open: Resume');
-        sendOctoprint('{ "command": "pause", "action": "resume" }')
+        sendOctoprint('job', '{ "command": "pause", "action": "resume" }')
 
 def doorClosed():
     if not isPaused:
         print('Door closed: Pause');
-        sendOctoprint('{ "command": "pause", "action": "pause" }')
+        sendOctoprint('job', '{ "command": "pause", "action": "pause" }')
 
 def sendDisconnect():
-    sendOctoprint('{ "command": "disconnect" }')
+    sendOctoprint('connection', '{ "command": "disconnect" }')
 
 def startCamera():
     sendUART('KR:C1')
@@ -179,9 +186,13 @@ def readEvent():
             elif event[4] == 'E':
                 stopCamera()
                 sendDisconnect()
-                powerTimeout = datetime.now() + timedelta(minutes=10)
+                powerTimeout = datetime.now() + timedelta(minutes=5)
         if event[3] == 'R':
             powerTimeout = None
+            if event[4] == '1':
+                startCamera()
+            elif event[4] == '0':
+                stopCamera()
             
     free_lib(lock, erase=True);
 
