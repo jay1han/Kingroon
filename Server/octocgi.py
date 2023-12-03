@@ -11,7 +11,9 @@ def lock_write(kr):
     lock.close()
 
 cgi_args = parse_qs(environ['QUERY_STRING'], keep_blank_values=True)
-action = cgi_args['action']
+action = cgi_args['action'][0]
+with open('/usr/share/octobox/cgi.log', 'w+') as log:
+    log.write(f'action={action}\n')
 
 if action == 'switch':
     lock_write('RR')
