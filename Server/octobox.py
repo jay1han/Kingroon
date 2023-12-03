@@ -50,7 +50,7 @@ for line in list_devices:
 
 device_name = list_devices[usb_device].strip()
 webcamPopen = ['/usr/local/bin/mjpg_streamer',
-               '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 1280x960',
+               '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480',
                '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
 
 webcam = subprocess.Popen(webcamPopen)
