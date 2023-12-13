@@ -510,7 +510,7 @@ void loop() {
 
         case 'R':
             if (message[4] == '1') {
-                if (isDoorOpen) {
+                if (!isDoorOpen) {
                     setBuzzer(BUZZ_DOOR);
                     Serial1.print("KR:R0\n");
                 } else {
