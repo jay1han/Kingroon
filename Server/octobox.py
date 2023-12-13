@@ -20,6 +20,9 @@ else:
     my_ip = 'localhost'
 
 isPowered = False
+powerTimeout = None
+discTimeout  = None
+
 def writeIndex():
     if isPowered:
         statusText  = 'Printer Ready'
@@ -175,9 +178,6 @@ def readOcto():
                 lcd.lcd_display_string(4, f'Now {datetime.now().strftime("%H:%M")}')
     except OSError:
         lcd.lcd_display_string(1, 'Server not running')
-
-powerTimeout = None
-discTimeout  = None
 
 def readEvent():
     global powerTimeout, discTimeout
