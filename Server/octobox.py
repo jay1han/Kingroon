@@ -126,6 +126,17 @@ def readUART():
                 doorOpen()
             sendUART('KR:OK')
 
+        elif command[3:5] == 'TL':
+            if isPowered:
+                if powerTimeout is not None:
+                    powerTimeout = None
+                    lcd.lcd_display_string(2, 'Touch to')
+                    lcd.lcd_display_string(3, 'power off')
+                else:
+                    sendUART('KR:R0\n')
+            else:
+                sendUART('KR:R1\n')
+
 def printTime(seconds):
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
@@ -207,9 +218,14 @@ while(True):
         sendDisconnect()
         powerTimeout = datetime.now() + timedelta(minutes=5)
         
-    if powerTimeout is not None and datetime.now() > powerTimeout:
-        powerTimeout = None
-        sendUART('KR:R0')
-        isPowered = False
+    if powerTimeout is not None:
+        if datetime.now() > powerTimeout:
+            powerTimeout = None
+            sendUART('KR:R0')
+            isPowered = False
+        else:
+            remaining = (powerTimeout - datetime.now()).total_seconds()
+            lcd.lcd_display_string(2, f'Shutdown {remaining // 60}:{remaining % 60}')
+            lcd.lcd_display_string(3, 'Touch to cancel')
         
     sleep(1)

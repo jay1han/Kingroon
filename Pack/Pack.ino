@@ -316,7 +316,7 @@ void switchShort() {
 }
 
 void switchLong() {
-    setRelay(-1);
+    Serial1.print("KR:TL\n");
 }
 
 void setup() {
