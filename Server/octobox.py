@@ -19,7 +19,9 @@ if match is not None:
 else:
     my_ip = 'localhost'
 
+isPaused = False
 isPowered = False
+isIdle = True
 powerTimeout = None
 discTimeout  = None
 
@@ -67,9 +69,6 @@ from datetime import time, datetime, timedelta
 from urllib.request import urlopen, Request
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
-
-tickTimeout = datetime.now() + timedelta(seconds=5)
-isPaused = False
 
 def sendOctoprint(command, data):
     request = Request(f'http://localhost:5000/api/{command}',
@@ -154,7 +153,8 @@ def readOcto():
 
             fileName = job['job']['file']['name']
             if fileName is None:
-                lcd.lcd_display_string(2, "")
+                #lcd.lcd_display_string(2, "")
+                pass
             else:
                 fileName = fileName.removesuffix('.gcode')
                 lcd.lcd_display_string(2, fileName)
@@ -168,7 +168,8 @@ def readOcto():
             if completion != 0 or fileEstimate != 0 or currentTime != 0:
                 lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
             else:
-                lcd.lcd_display_string(3, 'No print job')
+                #lcd.lcd_display_string(3, 'No print job')
+                pass
 
             remainingTime = job['progress']['printTimeLeft']
             if remainingTime is not None and remainingTime > 0:
