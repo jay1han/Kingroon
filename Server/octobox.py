@@ -131,6 +131,7 @@ def readUART():
 
         elif command[3:5] == 'TL':
             if isPowered:
+                global powerTimeout
                 if powerTimeout is not None:
                     powerTimeout = None
                     lcd.lcd_display_string(2, 'Touch to')
