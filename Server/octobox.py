@@ -135,8 +135,8 @@ def readUART():
                 global powerTimeout
                 if powerTimeout is not None:
                     powerTimeout = None
-                    lcd.lcd_display_string(2, 'Touch to')
-                    lcd.lcd_display_string(3, 'power off')
+                    lcd.lcd_display_string(2, 'Touch to power off')
+                    lcd.lcd_display_string(3, '')
                 else:
                     sendUART('KR:R0\n')
             else:
@@ -201,7 +201,10 @@ def readEvent():
                 startCamera()
             elif event[4] == 'E':
                 stopCamera()
-                discTimeout = datetime.now() + timedelta(seconds=60)
+                discTimeout = datetime.now() + timedelta(seconds=15)
+                lcd.lcd_display_string(2, 'Please remove print')
+                lcd.lcd_display_string(3, '')
+                
         if event[3] == 'R':
             powerTimeout = None
             discTimeout  = None
@@ -231,6 +234,8 @@ while(True):
             powerTimeout = None
             sendUART('KR:R0')
             isPowered = False
+            lcd.lcd_display_string(2, '')
+            lcd.lcd_display_string(3, '')
         else:
             remaining = int((powerTimeout - datetime.now()).total_seconds())
             lcd.lcd_display_string(2, f'Shutdown {remaining // 60}:{remaining % 60:02d}')
