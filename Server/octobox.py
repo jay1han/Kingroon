@@ -91,6 +91,8 @@ def doorClosed():
     if not isPaused:
         print('Door closed: Pause');
         sendOctoprint('job', '{ "command": "pause", "action": "pause" }')
+    if not isPowered:
+        stopCamera()
 
 def sendDisconnect():
     sendOctoprint('connection', '{ "command": "disconnect" }')
@@ -187,7 +189,6 @@ def readEvent():
     event = lock.read().strip()
     if event[:3] == 'KR:':
         print(event)
-        sendUART(event)
         lcd.lcd_display_string(2, event)
         if event[3] == 'P':
             powerTimeout = None
@@ -208,6 +209,11 @@ def readEvent():
                 startCamera()
             elif event[4] == '0':
                 stopCamera()
+                sendDisconnect()
+            elif event[4] == 'R':
+                if isPowered:
+                    sendDisconnect()
+        sendUART(event)
             
     free_lib(lock, erase=True);
 
@@ -227,7 +233,7 @@ while(True):
             isPowered = False
         else:
             remaining = int((powerTimeout - datetime.now()).total_seconds())
-            lcd.lcd_display_string(2, f'Shutdown {remaining // 60}:{remaining % 60}')
+            lcd.lcd_display_string(2, f'Shutdown {remaining // 60}:{remaining % 60:02d}')
             lcd.lcd_display_string(3, 'Touch to cancel')
         
     sleep(1)
