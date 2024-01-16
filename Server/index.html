@@ -48,7 +48,19 @@
           setTimeout(checkPage, 1000);
       }
 
-      window.addEventListener("load", setupPromise);
+      function setup() {
+          let port = window.location.port;
+          document.getElementById("log").innerHTML = port;
+          if (port == 8000 || port == 60080) {
+              document.getElementById("webcam").src = "http://jayhan.name:60088/?action=stream";
+          } else {
+              document.getElementById("webcam").src = "http://{localIP}:8080/?action=stream";
+          }
+
+          setupPromise();
+      }
+      
+      window.addEventListener("load", setup);
             
     </script>
     
@@ -62,7 +74,8 @@
         <button type="submit" name="action" value="switch">{switchButton}</button>
         <button type="submit" name="action" value="light">Light</button>
       </form>
-      <img style="transform: rotate(180deg);" src="http://{localIP}:8080/?action=stream" />
+      <img id="webcam" style="transform: rotate(180deg);" src="" />
     </center>
+    <p id="log"></p>
   </body>
 </html>

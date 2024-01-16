@@ -164,23 +164,36 @@ def readOcto():
             completion = job['progress']['completion']
             fileEstimate = job['job']['estimatedPrintTime']
             currentTime = job['progress']['printTime']
+            remainingTime = job['progress']['printTimeLeft']
+            
             if completion is None: completion = 0
             if fileEstimate is None: fileEstimate = 0
             if currentTime is None: currentTime = 0
+            if remainingTime is None: remainingTime = 0
             if completion != 0 or fileEstimate != 0 or currentTime != 0:
-                lcd.lcd_display_string(3, f'{printTime(currentTime)}/{printTime(fileEstimate)} {completion:.1f}%')
+                lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} ={completion:5.1f}%')
             else:
                 lcd.lcd_display_string(3, 'No print job')
 
-            remainingTime = job['progress']['printTimeLeft']
-            eta_round = "..:.."
-            if remainingTime is not None and remainingTime > 0:
-                eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
-                eta_round = eta.replace(second=0).strftime("%H:%M")
-            file_eta = "..:.."
+            eta1 = datetime.now().replace(second=0)
+            eta2 = datetime.now().replace(second=0)
+            if remainingTime != 0:
+                eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
             if fileEstimate != 0:
-                file_eta = (datetime.now() + timedelta(seconds = (fileEstimate + 60))).strftime("%H:%M")
-            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")} > {file_eta}~{eta_round}')
+                eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
+            if eta2 < eta1:
+                eta = eta2
+                eta2 = eta1
+                eta1 = eta
+            if eta1 <= datetime.now():
+                eta1 = 0
+            eta1s = "..:.."
+            if eta1 != 0:
+                eta1s = eta1.strftime("%H:%M")
+            eta2s = "..:.."
+            if eta2 != 0:
+                eta2s = eta2.strftime("%H:%M")
+            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
                 
     except OSError:
         lcd.lcd_display_string(1, 'Server not running')
