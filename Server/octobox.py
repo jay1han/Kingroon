@@ -173,14 +173,14 @@ def readOcto():
                 lcd.lcd_display_string(3, 'No print job')
 
             remainingTime = job['progress']['printTimeLeft']
-            eta_round = "??:??"
+            eta_round = "..:.."
             if remainingTime is not None and remainingTime > 0:
                 eta = datetime.now() + timedelta(seconds = (remainingTime + 60))
                 eta_round = eta.replace(second=0).strftime("%H:%M")
-            file_eta = "??:??"
+            file_eta = "..:.."
             if fileEstimate != 0:
                 file_eta = (datetime.now() + timedelta(seconds = (fileEstimate + 60))).strftime("%H:%M")
-            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")} > {file_eta}-{eta_round}')
+            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")} > {file_eta}~{eta_round}')
                 
     except OSError:
         lcd.lcd_display_string(1, 'Server not running')
