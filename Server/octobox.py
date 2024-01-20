@@ -135,6 +135,7 @@ def readUART():
 
         elif command[3:5] == 'TL':
             if isPowered:
+                isIdle = True
                 global powerTimeout, discTimeout
                 if powerTimeout is not None:
                     powerTimeout = None
@@ -163,7 +164,7 @@ def queryOcto(command):
 def readOcto():
     hasJob = False
 
-    if powerTimeout is None:
+    if not isIdle:
         job = queryOcto('job')
         if job is not None:
             state = job['state']
@@ -186,10 +187,10 @@ def readOcto():
             if currentTime is None: currentTime = 0
             if remainingTime is None: remainingTime = 0
             if currentTime != 0:
-                lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} ={completion:5.1f}%')
+                hasJob = True
+                lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} @{completion:5.1f}%')
 
-                eta1 = datetime.now().replace(second=0)
-                eta2 = datetime.now().replace(second=0)
+                eta2 = eta1 = datetime.now()
                 if remainingTime != 0:
                     eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
                 if fileEstimate != 0:
@@ -204,15 +205,13 @@ def readOcto():
                 if eta2 <= datetime.now():
                     eta2 = 0
 
-                if eta1 != 0 or eta2 != 0:
-                    eta1s = "..:.."
-                    if eta1 != 0:
-                        eta1s = eta1.strftime("%H:%M")
-                    eta2s = "..:.."
-                    if eta2 != 0:
-                        eta2s = eta2.strftime("%H:%M")
-                    lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
-                    hasJob = True
+                eta1s = "..:.."
+                if eta1 != 0:
+                    eta1s = eta1.strftime("%H:%M")
+                eta2s = "..:.."
+                if eta2 != 0:
+                    eta2s = eta2.strftime("%H:%M")
+                lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
 
     if not hasJob:
         lcd.lcd_display_string(3, 'Printer idle')
@@ -222,6 +221,13 @@ def readOcto():
         else:
             temp0 = float(printer['temperature']['tool0']['actual'])
             tempBed = float(printer['temperature']['bed']['actual'])
+            if tempBed >= 35.0:
+                isHot = True
+            else:
+                if isHot:
+                    # Beep once
+                    pass
+                isHot = False
             lcd.lcd_display_string(4, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')            
 
 def readEvent():
@@ -240,8 +246,10 @@ def readEvent():
                 isPaused = False
             elif event[4] == 'S':
                 startCamera()
+                isIdle = False
             elif event[4] == 'E':
                 stopCamera()
+                isIdle = True
                 discTimeout  = datetime.now() + timedelta(seconds=DISC_DELAY)
                 powerTimeout = datetime.now() + timedelta(seconds=POWER_DELAY)
                 
@@ -260,6 +268,16 @@ def readEvent():
             
     free_lib(lock, erase=True);
 
+def getIdle():
+    job = queryOcto('job')
+    if job is not None:
+        state = job['state']
+        if state.startswith('Printing'):
+            return False
+    return True
+
+isIdle = getIdle()
+        
 while(True):
     readUART()
     readOcto()
@@ -277,7 +295,7 @@ while(True):
             lcd.lcd_display_string(2, '')
             lcd.lcd_display_string(3, '')
         else:
-            remaining = int((powerTimeout - datetime.now()).total_seconds())
+            remaining = int((discTimeout - datetime.now()).total_seconds())
             lcd.lcd_display_string(2, f'Shutdown in {remaining // 60}:{remaining % 60:02d}')
         
     sleep(1)
