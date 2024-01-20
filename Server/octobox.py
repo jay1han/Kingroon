@@ -162,61 +162,60 @@ def queryOcto(command):
 
 def readOcto():
     hasJob = False
-    
-    job = queryOcto('job')
-    if job is not None:
-        state = job['state']
-        lcd.lcd_display_string(1, state)
 
-        fileName = job['job']['file']['name']
-        if fileName is None:
-            fileName = ''
-        else:
-            fileName = fileName.removesuffix('.gcode')
-            lcd.lcd_display_string(2, fileName)
+    if powerTimeout is None:
+        job = queryOcto('job')
+        if job is not None:
+            state = job['state']
+            lcd.lcd_display_string(1, state)
 
-        completion = job['progress']['completion']
-        fileEstimate = job['job']['estimatedPrintTime']
-        currentTime = job['progress']['printTime']
-        remainingTime = job['progress']['printTimeLeft']
+            fileName = job['job']['file']['name']
+            if fileName is None:
+                fileName = ''
+            else:
+                fileName = fileName.removesuffix('.gcode')
+                lcd.lcd_display_string(2, fileName)
 
-        if completion is None: completion = 0
-        if fileEstimate is None: fileEstimate = 0
-        if currentTime is None: currentTime = 0
-        if remainingTime is None: remainingTime = 0
-        if currentTime != 0:
-            lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} ={completion:5.1f}%')
+            completion = job['progress']['completion']
+            fileEstimate = job['job']['estimatedPrintTime']
+            currentTime = job['progress']['printTime']
+            remainingTime = job['progress']['printTimeLeft']
 
-            eta1 = datetime.now().replace(second=0)
-            eta2 = datetime.now().replace(second=0)
-            if remainingTime != 0:
-                eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
-            if fileEstimate != 0:
-                eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
-            if eta2 < eta1:
-                eta = eta2
-                eta2 = eta1
-                eta1 = eta
-                
-            if eta1 <= datetime.now():
-                eta1 = 0
-            if eta2 <= datetime.now():
-                eta2 = 0
+            if completion is None: completion = 0
+            if fileEstimate is None: fileEstimate = 0
+            if currentTime is None: currentTime = 0
+            if remainingTime is None: remainingTime = 0
+            if currentTime != 0:
+                lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} ={completion:5.1f}%')
 
-            if eta1 != 0 or eta2 != 0:
-                eta1s = "..:.."
-                if eta1 != 0:
-                    eta1s = eta1.strftime("%H:%M")
-                eta2s = "..:.."
-                if eta2 != 0:
-                    eta2s = eta2.strftime("%H:%M")
-                lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
-                hasJob = True
+                eta1 = datetime.now().replace(second=0)
+                eta2 = datetime.now().replace(second=0)
+                if remainingTime != 0:
+                    eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
+                if fileEstimate != 0:
+                    eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
+                if eta2 < eta1:
+                    eta = eta2
+                    eta2 = eta1
+                    eta1 = eta
 
-    else:
-        lcd.lcd_display_string(3, 'Printer idle')
+                if eta1 <= datetime.now():
+                    eta1 = 0
+                if eta2 <= datetime.now():
+                    eta2 = 0
+
+                if eta1 != 0 or eta2 != 0:
+                    eta1s = "..:.."
+                    if eta1 != 0:
+                        eta1s = eta1.strftime("%H:%M")
+                    eta2s = "..:.."
+                    if eta2 != 0:
+                        eta2s = eta2.strftime("%H:%M")
+                    lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
+                    hasJob = True
 
     if not hasJob:
+        lcd.lcd_display_string(3, 'Printer idle')
         printer = queryOcto('printer')
         if printer is None:
             lcd.lcd_display_string(4, '')
