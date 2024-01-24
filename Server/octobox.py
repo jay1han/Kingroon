@@ -21,7 +21,7 @@ else:
 
 isPaused = False
 isPowered = False
-isIdle = True
+isHot = False
 powerTimeout = None
 discTimeout  = None
 
@@ -70,8 +70,8 @@ from urllib.request import urlopen, Request
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
 
-DISC_DELAY = 300
-POWER_DELAY = 310
+DISC_DELAY = 570
+POWER_DELAY = 600
 
 def sendOctoprint(command, data):
     request = Request(f'http://localhost:5000/api/{command}',
@@ -135,7 +135,6 @@ def readUART():
 
         elif command[3:5] == 'TL':
             if isPowered:
-                isIdle = True
                 global powerTimeout, discTimeout
                 if powerTimeout is not None:
                     powerTimeout = None
@@ -143,13 +142,14 @@ def readUART():
                         discTimeout = None
                     lcd.lcd_display_string(2, 'Touch to power off')
                     lcd.lcd_display_string(3, '')
-                    lcd.lcd_display_string(4, '')
                 else:
                     sendUART('KR:R0\n')
             else:
                 sendUART('KR:R1\n')
 
 def printTime(seconds):
+    if seconds == 0:
+        return '..:..'
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
 def queryOcto(command):
@@ -164,18 +164,19 @@ def queryOcto(command):
 def readOcto():
     hasJob = False
 
-    if not isIdle:
-        job = queryOcto('job')
-        if job is not None:
-            state = job['state']
-            lcd.lcd_display_string(1, state)
+    job = queryOcto('job')
+    if job is not None:
+        state = job['state']
+        lcd.lcd_display_string(1, state)
 
-            fileName = job['job']['file']['name']
-            if fileName is None:
-                fileName = ''
-            else:
-                fileName = fileName.removesuffix('.gcode')
-                lcd.lcd_display_string(2, fileName)
+        if state.startswith('Printing'):
+            if powerTimeout is None:
+                fileName = job['job']['file']['name']
+                if fileName is None:
+                    fileName = ''
+                else:
+                    fileName = fileName.removesuffix('.gcode')
+                    lcd.lcd_display_string(2, fileName)
 
             completion = job['progress']['completion']
             fileEstimate = job['job']['estimatedPrintTime']
@@ -188,7 +189,7 @@ def readOcto():
             if remainingTime is None: remainingTime = 0
             if currentTime != 0:
                 hasJob = True
-                lcd.lcd_display_string(3, f'{printTime(fileEstimate)}) {printTime(currentTime)} @{completion:5.1f}%')
+                lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{completion:5.1f}%')
 
                 eta2 = eta1 = datetime.now()
                 if remainingTime != 0:
@@ -214,22 +215,29 @@ def readOcto():
                 lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
 
     if not hasJob:
-        lcd.lcd_display_string(3, 'Printer idle')
+        global isHot
+        if isHot:
+            lcd.lcd_display_string(3, 'Printer idle')
+            
         printer = queryOcto('printer')
-        if printer is None:
-            lcd.lcd_display_string(4, '')
-        else:
-            temp0 = float(printer['temperature']['tool0']['actual'])
-            tempBed = float(printer['temperature']['bed']['actual'])
+        if printer is not None:
+            temp0 = 0
+            if printer['temperature'].get('tool0') is not None:
+                temp0 = float(printer['temperature']['tool0']['actual'])
+            tempBed = 0
+            if printer['temperature'].get('bed') is not None:
+                tempBed = float(printer['temperature']['bed']['actual'])
+            
             if tempBed >= 35.0:
                 isHot = True
             else:
                 if isHot:
+                    lcd.lcd_display_string(3, 'Please remove print')
                     # Beep once
-                    pass
                 isHot = False
-            lcd.lcd_display_string(4, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')            
 
+            lcd.lcd_display_string(4, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')
+            
 def readEvent():
     global powerTimeout, discTimeout
     lock = lock_lib()
@@ -246,10 +254,8 @@ def readEvent():
                 isPaused = False
             elif event[4] == 'S':
                 startCamera()
-                isIdle = False
             elif event[4] == 'E':
                 stopCamera()
-                isIdle = True
                 discTimeout  = datetime.now() + timedelta(seconds=DISC_DELAY)
                 powerTimeout = datetime.now() + timedelta(seconds=POWER_DELAY)
                 
@@ -268,16 +274,6 @@ def readEvent():
             
     free_lib(lock, erase=True);
 
-def getIdle():
-    job = queryOcto('job')
-    if job is not None:
-        state = job['state']
-        if state.startswith('Printing'):
-            return False
-    return True
-
-isIdle = getIdle()
-        
 while(True):
     readUART()
     readOcto()
@@ -295,7 +291,7 @@ while(True):
             lcd.lcd_display_string(2, '')
             lcd.lcd_display_string(3, '')
         else:
-            remaining = int((discTimeout - datetime.now()).total_seconds())
+            remaining = int((powerTimeout - datetime.now()).total_seconds())
             lcd.lcd_display_string(2, f'Shutdown in {remaining // 60}:{remaining % 60:02d}')
         
     sleep(1)
