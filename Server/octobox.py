@@ -211,7 +211,8 @@ def readOcto():
                 lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
 
         else:
-            lcd.lcd_display_string(1, state)
+            if powerTimeout is None:
+                lcd.lcd_display_string(1, state)
 
     printer = queryOcto('printer')
     if printer is not None:
