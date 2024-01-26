@@ -21,7 +21,6 @@ else:
 
 isPaused = False
 isPowered = False
-isHot = False
 powerTimeout = None
 discTimeout  = None
 
@@ -140,8 +139,7 @@ def readUART():
                     powerTimeout = None
                     if discTimeout is not None:
                         discTimeout = None
-                    lcd.lcd_display_string(2, 'Touch to power off')
-                    lcd.lcd_display_string(3, '')
+                    lcd.lcd_display_string(1, 'Touch to power off')
                 else:
                     sendUART('KR:R0\n')
             else:
@@ -167,7 +165,6 @@ def readOcto():
     job = queryOcto('job')
     if job is not None:
         state = job['state']
-        lcd.lcd_display_string(1, state)
 
         if state.startswith('Printing'):
             if powerTimeout is None:
@@ -176,8 +173,7 @@ def readOcto():
                     fileName = ''
                 else:
                     fileName = fileName.removesuffix('.gcode')
-                    lcd.lcd_display_string(2, fileName)
-
+                    lcd.lcd_display_string(1, fileName)
             completion = job['progress']['completion']
             fileEstimate = job['job']['estimatedPrintTime']
             currentTime = job['progress']['printTime']
@@ -214,29 +210,18 @@ def readOcto():
                     eta2s = eta2.strftime("%H:%M")
                 lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
 
-    if not hasJob:
-        global isHot
-        if isHot:
-            lcd.lcd_display_string(3, 'Printer idle')
-            
-        printer = queryOcto('printer')
-        if printer is not None:
-            temp0 = 0
-            if printer['temperature'].get('tool0') is not None:
-                temp0 = float(printer['temperature']['tool0']['actual'])
-            tempBed = 0
-            if printer['temperature'].get('bed') is not None:
-                tempBed = float(printer['temperature']['bed']['actual'])
-            
-            if tempBed >= 35.0:
-                isHot = True
-            else:
-                if isHot:
-                    lcd.lcd_display_string(3, 'Please remove print')
-                    # Beep once
-                isHot = False
+        else:
+            lcd.lcd_display_string(1, state)
 
-            lcd.lcd_display_string(4, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')
+    printer = queryOcto('printer')
+    if printer is not None:
+        temp0 = 0
+        if printer['temperature'].get('tool0') is not None:
+            temp0 = float(printer['temperature']['tool0']['actual'])
+        tempBed = 0
+        if printer['temperature'].get('bed') is not None:
+            tempBed = float(printer['temperature']['bed']['actual'])
+        lcd.lcd_display_string(2, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')
             
 def readEvent():
     global powerTimeout, discTimeout
@@ -244,7 +229,7 @@ def readEvent():
     event = lock.read().strip()
     if event[:3] == 'KR:':
         print(event)
-        lcd.lcd_display_string(2, event)
+        lcd.lcd_display_string(1, event)
         if event[3] == 'P':
             powerTimeout = None
             discTimeout = None
@@ -254,6 +239,8 @@ def readEvent():
                 isPaused = False
             elif event[4] == 'S':
                 startCamera()
+            elif event[4] == 'C':
+                stopCamera()
             elif event[4] == 'E':
                 stopCamera()
                 discTimeout  = datetime.now() + timedelta(seconds=DISC_DELAY)
@@ -288,10 +275,8 @@ while(True):
             powerTimeout = None
             sendUART('KR:R0')
             isPowered = False
-            lcd.lcd_display_string(2, '')
-            lcd.lcd_display_string(3, '')
         else:
             remaining = int((powerTimeout - datetime.now()).total_seconds())
-            lcd.lcd_display_string(2, f'Shutdown in {remaining // 60}:{remaining % 60:02d}')
+            lcd.lcd_display_string(1, f'Shutdown in {remaining // 60}:{remaining % 60:02d}')
         
     sleep(1)

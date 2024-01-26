@@ -21,4 +21,7 @@ elif action == 'Pause':      # KR:PP
 elif action == 'Resume':     # KR:PR
     lock.write('KR:PR\n')
 
+elif action == 'Cancel':     # KR:PC
+    lock.write('KR:PC\n')
+
 free_lib(lock, erase=False);
