@@ -21,8 +21,10 @@ else:
 
 isPaused = False
 isPowered = False
+isCooling = False
+isClosing = False
 powerTimeout = None
-discTimeout  = None
+POWER_TIMEOUT = 300
 
 def writeIndex():
     if isPowered:
@@ -97,7 +99,12 @@ def doorClosed():
         stopCamera()
 
 def sendDisconnect():
-    sendOctoprint('connection', '{ "command": "disconnect" }')
+    global isClosing, isCooling
+    isCooling = False
+    if not isClosing:
+        isClosing = True
+        sendOctoprint('connection', '{ "command": "disconnect" }')
+        powerTimeout = datetime.now() + timedelta(seconds=POWER_TIMEOUT)
 
 def startCamera():
     sendUART('KR:C1')
@@ -134,14 +141,7 @@ def readUART():
 
         elif command[3:5] == 'TL':
             if isPowered:
-                global powerTimeout, discTimeout
-                if powerTimeout is not None:
-                    powerTimeout = None
-                    if discTimeout is not None:
-                        discTimeout = None
-                    lcd.lcd_display_string(1, 'Touch to power off')
-                else:
-                    sendUART('KR:R0\n')
+                sendUART('KR:R0\n')
             else:
                 sendUART('KR:R1\n')
 
@@ -160,20 +160,19 @@ def queryOcto(command):
         return None
 
 def readOcto():
-    hasJob = False
-
+    global isCooling
+    
     job = queryOcto('job')
     if job is not None:
         state = job['state']
 
         if state.startswith('Printing'):
-            if powerTimeout is None:
-                fileName = job['job']['file']['name']
-                if fileName is None:
-                    fileName = ''
-                else:
-                    fileName = fileName.removesuffix('.gcode')
-                    lcd.lcd_display_string(1, fileName)
+            fileName = job['job']['file']['name']
+            if fileName is None:
+                fileName = ''
+            else:
+                fileName = fileName.removesuffix('.gcode')
+                lcd.lcd_display_string(1, fileName)
             completion = job['progress']['completion']
             fileEstimate = job['job']['estimatedPrintTime']
             currentTime = job['progress']['printTime']
@@ -184,7 +183,6 @@ def readOcto():
             if currentTime is None: currentTime = 0
             if remainingTime is None: remainingTime = 0
             if currentTime != 0:
-                hasJob = True
                 lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{completion:5.1f}%')
 
                 eta2 = eta1 = datetime.now()
@@ -211,7 +209,9 @@ def readOcto():
                 lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
 
         else:
-            if powerTimeout is None:
+            if isCooling:
+                lcd.lcd_display_string(1, "Cooling")
+            else:
                 lcd.lcd_display_string(1, state)
 
     printer = queryOcto('printer')
@@ -223,17 +223,19 @@ def readOcto():
         if printer['temperature'].get('bed') is not None:
             tempBed = float(printer['temperature']['bed']['actual'])
         lcd.lcd_display_string(2, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')
+
+        if isCooling and tempBed < 32.0:
+            sendDisconnect()
             
 def readEvent():
-    global powerTimeout, discTimeout
+    global isCooling
+    
     lock = lock_lib()
     event = lock.read().strip()
     if event[:3] == 'KR:':
         print(event)
         lcd.lcd_display_string(1, event)
         if event[3] == 'P':
-            powerTimeout = None
-            discTimeout = None
             if event[4] == 'P':
                 isPaused = True
             elif event[4] == 'R':
@@ -242,14 +244,12 @@ def readEvent():
                 startCamera()
             elif event[4] == 'C':
                 stopCamera()
+                isCooling = True
             elif event[4] == 'E':
                 stopCamera()
-                discTimeout  = datetime.now() + timedelta(seconds=DISC_DELAY)
-                powerTimeout = datetime.now() + timedelta(seconds=POWER_DELAY)
+                isCooling = True
                 
         if event[3] == 'R':
-            powerTimeout = None
-            discTimeout  = None
             if event[4] == '1':
                 startCamera()
             elif event[4] == '0':
@@ -258,6 +258,7 @@ def readEvent():
             elif event[4] == 'R':
                 if isPowered:
                     sendDisconnect()
+                    
         sendUART(event)
             
     free_lib(lock, erase=True);
@@ -266,18 +267,10 @@ while(True):
     readUART()
     readOcto()
     readEvent()
-    
-    if discTimeout is not None and datetime.now() > discTimeout:
-        discTimeout = None
-        sendDisconnect()
-        
+
     if powerTimeout is not None:
         if datetime.now() > powerTimeout:
             powerTimeout = None
-            sendUART('KR:R0')
-            isPowered = False
-        else:
-            remaining = int((powerTimeout - datetime.now()).total_seconds())
-            lcd.lcd_display_string(1, f'Shutdown in {remaining // 60}:{remaining % 60:02d}')
-        
+            sendUART("KR:R0")
+    
     sleep(1)

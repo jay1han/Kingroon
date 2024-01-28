@@ -24,4 +24,7 @@ elif action == 'Resume':     # KR:PR
 elif action == 'Cancel':     # KR:PC
     lock.write('KR:PC\n')
 
+elif action == 'Disconnect':  
+    lock.write('KR:R0\n')
+
 free_lib(lock, erase=False);
