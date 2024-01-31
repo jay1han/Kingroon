@@ -526,6 +526,11 @@ void loop() {
                 setLight(1);
                 Serial1.print("KR:ok\n");
                 break;
+
+            default:
+                setLight(-1);
+                Serial1.print("KR:ok\n");
+                break;
             }
             break;
 
