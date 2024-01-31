@@ -466,6 +466,13 @@ void loop() {
             }
             break;
 
+        case 'B':
+            if (message[4] >= '0' && message[4] <= '9') {
+                setBuzzer(message[4] - '0');
+                Serial1.print("KR:ok\n");
+            }
+            break;
+
         case 'P':
             switch(message[4]) {
             case 'S': case 'R':
@@ -503,6 +510,20 @@ void loop() {
 
             default:
                 setCamera(CAMERA_TOGGLE);
+                Serial1.print("KR:ok\n");
+                break;
+            }
+            break;
+
+        case 'L':
+            switch(message[4]) {
+            case '0':
+                setLight(0);
+                Serial1.print("KR:ok\n");
+                break;
+                
+            case '1':
+                setLight(1);
                 Serial1.print("KR:ok\n");
                 break;
             }
