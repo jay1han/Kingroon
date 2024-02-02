@@ -17,7 +17,9 @@ with open('/usr/share/octobox/cgi.log', 'w+') as log:
 
 if action == 'switch':
     lock_write('RR')
-elif action == 'light':
+elif action == 'camera':
     lock_write('CC')
+elif action == 'light':
+    lock_write('LL')
 
 print('Location: \\\n\n')

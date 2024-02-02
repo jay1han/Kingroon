@@ -25,6 +25,6 @@ elif action == 'Cancel':     # KR:PC
     lock.write('KR:PC\n')
 
 elif action == 'Disconnect':  
-    lock.write('KR:R0\n')
+    lock.write('KR:RX\n')
 
 free_lib(lock, erase=False);

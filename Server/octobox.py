@@ -24,7 +24,7 @@ isPowered = False
 isCooling = False
 isClosing = False
 powerTimeout = None
-POWER_TIMEOUT = 300
+POWER_TIMEOUT = 15
 
 def writeIndex():
     if isPowered:
@@ -99,11 +99,12 @@ def doorClosed():
         stopCamera()
 
 def sendDisconnect():
-    global isClosing, isCooling
+    global isClosing, isCooling, powerTimeout
     isCooling = False
     if not isClosing:
         isClosing = True
         sendOctoprint('connection', '{ "command": "disconnect" }')
+        sendUART('KR:B2')
         powerTimeout = datetime.now() + timedelta(seconds=POWER_TIMEOUT)
 
 def startCamera():
@@ -127,7 +128,7 @@ def readUART():
             global isPowered
             if command[4] == '1':
                 isPowered = True
-            else:
+            elif command[4] == '0':
                 isPowered = False
             writeIndex()
             sendUART('KR:OK')
@@ -140,10 +141,13 @@ def readUART():
             sendUART('KR:OK')
 
         elif command[3:5] == 'TL':
+            isCooling = False
             if isPowered:
                 sendUART('KR:R0\n')
+                isPowered = False
             else:
                 sendUART('KR:R1\n')
+                isPowered = True
 
 def printTime(seconds):
     if seconds == 0:
@@ -173,6 +177,8 @@ def readOcto():
             else:
                 fileName = fileName.removesuffix('.gcode')
                 lcd.lcd_display_string(1, fileName)
+            powerTimeout = None
+            
             completion = job['progress']['completion']
             fileEstimate = job['job']['estimatedPrintTime']
             currentTime = job['progress']['printTime']
@@ -222,13 +228,13 @@ def readOcto():
         tempBed = 0
         if printer['temperature'].get('bed') is not None:
             tempBed = float(printer['temperature']['bed']['actual'])
-        lcd.lcd_display_string(2, f'Ext:{temp0:5.1f}C Bed:{tempBed:4.1f}C')
+        lcd.lcd_display_string(2, f'Pr:{temp0 + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
 
         if isCooling and tempBed < 32.0:
             sendDisconnect()
             
 def readEvent():
-    global isCooling
+    global isCooling, powerTimeout
     
     lock = lock_lib()
     event = lock.read().strip()
@@ -241,6 +247,8 @@ def readEvent():
             elif event[4] == 'R':
                 isPaused = False
             elif event[4] == 'S':
+                powerTimeout = None
+                isClosing = False
                 startCamera()
             elif event[4] == 'C':
                 stopCamera()
@@ -251,6 +259,8 @@ def readEvent():
                 
         if event[3] == 'R':
             if event[4] == '1':
+                powerTimeout = None
+                isClosing = False
                 startCamera()
             elif event[4] == '0':
                 stopCamera()
@@ -258,6 +268,8 @@ def readEvent():
             elif event[4] == 'R':
                 if isPowered:
                     sendDisconnect()
+                else:
+                    powerTimeout = None
                     
         sendUART(event)
             
