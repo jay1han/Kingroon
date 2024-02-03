@@ -253,7 +253,7 @@ void setBuzzer(int tone) {
 }
 
 int setRelay(int command) {
-    static int state;
+    static int state = 0;
     
     Serial.printf("Relay command %d, state %d", command, state);
     if (command < 0) {
@@ -276,6 +276,7 @@ int setRelay(int command) {
     if (state == 1) digitalWrite(PIN_RELAY, 1);
     else digitalWrite(PIN_RELAY, 0);
     Serial1.printf("KR:R%d\n", state);
+    Serial.printf("Report KR:R%d\n", state);
     
     isPowered = state;
     if (!isPowered) isPrinting = false;
