@@ -19,20 +19,13 @@ if match is not None:
 else:
     my_ip = 'localhost'
 
-isPaused = False
-isPowered = False
-isCooling = False
-isClosing = False
-powerTimeout = None
-POWER_TIMEOUT = 15
-
-def writeIndex():
+def writeIndex(isPowered):
     if isPowered:
-        statusText  = 'Printer Ready'
-        switchButton = 'Power off'
+        statusText  = 'Printer On'
+        switchButton = 'Turn Off'
     else:
         statusText  = 'Printer Off'
-        switchButton = 'Power on'
+        switchButton = 'Turn On'
         
     with open('/usr/share/octobox/index.html') as source:
         html = source.read()
@@ -43,7 +36,7 @@ def writeIndex():
                      .replace('{switchButton}', switchButton)\
                      )
 
-writeIndex()
+writeIndex(False)
 
 list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'], capture_output=True, text=True).stdout.splitlines()
 
@@ -68,221 +61,301 @@ lcd.lcd_display_string(2, "Webcam started")
 
 from datetime import time, datetime, timedelta
 from urllib.request import urlopen, Request
+from enum import Enum
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
-
-DISC_DELAY = 570
-POWER_DELAY = 600
-
-def sendOctoprint(command, data):
-    request = Request(f'http://localhost:5000/api/{command}',
-                      headers = { 'X-Api-Key': APIKEY,
-                                  'Content-Type': 'application/json'
-                                  }
-                      )
-                                  
-    try:
-        urlopen(request, bytes(data, 'ascii'))
-    except OSError:
-        pass
-
-def doorOpen():
-    if isPaused:
-        print('Door open: Resume');
-        sendOctoprint('job', '{ "command": "pause", "action": "resume" }')
-
-def doorClosed():
-    if not isPaused:
-        print('Door closed: Pause');
-        sendOctoprint('job', '{ "command": "pause", "action": "pause" }')
-    if not isPowered:
-        stopCamera()
-
-def sendDisconnect():
-    global isClosing, isCooling, powerTimeout
-    isCooling = False
-    if not isClosing:
-        isClosing = True
-        sendOctoprint('connection', '{ "command": "disconnect" }')
-        sendUART('KR:B2')
-        powerTimeout = datetime.now() + timedelta(seconds=POWER_TIMEOUT)
-
-def startCamera():
-    sendUART('KR:C1')
-
-def stopCamera():
-    sendUART('KR:C0')
-
-def readUART():
-    command = UART.readline().decode(errors='ignore')
-    if command[:3] == 'KR:':
-        print(command)
-        
-        if command[3:5] == 'OK':
-            sendUART('KR:OK')
-
-        elif command[3] == 'L':
-            sendUART('KR:OK')
-            
-        elif command[3] == 'R':
-            global isPowered
-            if command[4] == '1':
-                isPowered = True
-            elif command[4] == '0':
-                isPowered = False
-            writeIndex()
-            sendUART('KR:OK')
-            
-        elif command[3] == 'D':
-            if command[4] == 'C':
-                doorClosed()
-            elif command[4] == 'O':
-                doorOpen()
-            sendUART('KR:OK')
-
-        elif command[3:5] == 'TL':
-            isCooling = False
-            if isPowered:
-                sendUART('KR:R0\n')
-                isPowered = False
-            else:
-                sendUART('KR:R1\n')
-                isPowered = True
 
 def printTime(seconds):
     if seconds == 0:
         return '..:..'
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
-def queryOcto(command):
-    try:
-        with urlopen(f'http://localhost:5000/api/{command}?apikey={APIKEY}') as jobapi:
-            response = json.loads(jobapi.read())
-        return response
-    except OSError:
-        lcd.lcd_display_string(1, 'Offline')
-        return None
-
-def readOcto():
-    global isCooling
+def readEvent():
+    lock = lock_lib()
+    event = lock.read().strip()
     
-    job = queryOcto('job')
-    if job is not None:
-        state = job['state']
-
-        if state.startswith('Printing'):
-            fileName = job['job']['file']['name']
-            if fileName is None:
-                fileName = ''
-            else:
-                fileName = fileName.removesuffix('.gcode')
-                lcd.lcd_display_string(1, fileName)
-            powerTimeout = None
+    response = ''
+    if event[:3] == 'KR:':
+        print(f'Event "{event}"')
+        if event[3] == 'C' or event[3] == 'L':
+            sendUART(event)
+        else:
+            response = event[3:]
             
-            completion = job['progress']['completion']
+    free_lib(lock, erase=True);
+    return response
+
+def readUART():
+    command = UART.readline().decode(errors='ignore').strip()
+    if command[:3] == 'KR:':
+        print(f'UART "{command}"')
+        return command[3:]
+    else:
+        return ''
+
+class Octoprint:
+    def __init__(self):
+        pass
+
+    def query(self, command):
+        try:
+            with urlopen(f'http://localhost:5000/api/{command}?apikey={APIKEY}') as jobapi:
+                return json.loads(jobapi.read())
+        except OSError:
+            return None
+
+    def request(self, command, data):
+        request = Request(f'http://localhost:5000/api/{command}',
+                          headers = { 'X-Api-Key': APIKEY,
+                                      'Content-Type': 'application/json'
+                                     }
+                          )
+        try:
+            urlopen(request, bytes(data, 'ascii'))
+        except OSError:
+            pass
+
+    def disconnect(self):
+        self.request('connection', '{ "command": "disconnect" }')
+
+    def connect(self):
+        self.request('connection', '{ "command": "connect" }')
+
+    def cancel(self):
+        self.request('job', '{ "command": "cancel" }')
+
+    def getState(self):
+        job = self.query('job')
+        if job is None:
+            return 'Disconnected'
+        else:
+            return job['state']
+
+    def getTemps(self):
+        printer = self.query('printer')
+        if printer is None:
+            return 0, 0
+        else:
+            tempExt = 0
+            if printer['temperature'].get('tool0') is not None:
+                tempExt = float(printer['temperature']['tool0']['actual'])
+            tempBed = 0
+            if printer['temperature'].get('bed') is not None:
+                tempBed = float(printer['temperature']['bed']['actual'])
+            return tempExt, tempBed
+
+    def getJobInfo(self):
+        job = self.query('job')
+        if job is None:
+            return '', 0, 0.0, 0, 0
+        else:
+            filename = job['job']['file']['name']
+            if filename is None:
+                filename = ''
+            else:
+                filename =  filename.removesuffix('.gcode')
+
             fileEstimate = job['job']['estimatedPrintTime']
+            donePercent = job['progress']['completion']
             currentTime = job['progress']['printTime']
             remainingTime = job['progress']['printTimeLeft']
 
-            if completion is None: completion = 0
             if fileEstimate is None: fileEstimate = 0
+            if donePercent is None: donePercent = 0
             if currentTime is None: currentTime = 0
             if remainingTime is None: remainingTime = 0
-            if currentTime != 0:
-                lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{completion:5.1f}%')
 
-                eta2 = eta1 = datetime.now()
-                if remainingTime != 0:
-                    eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
-                if fileEstimate != 0:
-                    eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
-                if eta2 < eta1:
-                    eta = eta2
-                    eta2 = eta1
-                    eta1 = eta
+            return filename, fileEstimate, donePercent, currentTime, remainingTime
 
-                if eta1 <= datetime.now():
-                    eta1 = 0
-                if eta2 <= datetime.now():
-                    eta2 = 0
+class State(Enum):
+    OFF      = 0
+    POWERON  = 1
+    IDLE     = 2
+    PRINTING = 3
+    COOLING  = 4
+    COLD     = 5
+            
+class Octobox:
+    def __init__(self):
+        self.state = State.OFF
+        self.timeout = None
+        self.o = Octoprint()
+        sendUART('KR:R?')
+        self.setTimeout(15)
 
-                eta1s = "..:.."
-                if eta1 != 0:
-                    eta1s = eta1.strftime("%H:%M")
-                eta2s = "..:.."
-                if eta2 != 0:
-                    eta2s = eta2.strftime("%H:%M")
-                lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
-
+    def setTimeout(self, seconds):
+        if seconds == 0:
+            self.timeout = None
         else:
-            if isCooling:
-                lcd.lcd_display_string(1, "Cooling")
-            else:
-                lcd.lcd_display_string(1, state)
+            self.timeout = datetime.now() + timedelta(seconds = seconds)
 
-    printer = queryOcto('printer')
-    if printer is not None:
-        temp0 = 0
-        if printer['temperature'].get('tool0') is not None:
-            temp0 = float(printer['temperature']['tool0']['actual'])
-        tempBed = 0
-        if printer['temperature'].get('bed') is not None:
-            tempBed = float(printer['temperature']['bed']['actual'])
-        lcd.lcd_display_string(2, f'Pr:{temp0 + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
-
-        if isCooling and tempBed < 32.0:
-            sendDisconnect()
-            
-def readEvent():
-    global isCooling, powerTimeout
+    def isTimedout(self):
+        if self.timeout is not None and datetime.now() > self.timeout:
+            self.timeout = None
+            print('Timeout')
+            return True
+        else:
+            return False
     
-    lock = lock_lib()
-    event = lock.read().strip()
-    if event[:3] == 'KR:':
-        print(event)
-        lcd.lcd_display_string(1, event)
-        if event[3] == 'P':
-            if event[4] == 'P':
-                isPaused = True
-            elif event[4] == 'R':
-                isPaused = False
-            elif event[4] == 'S':
-                powerTimeout = None
-                isClosing = False
-                startCamera()
-            elif event[4] == 'C':
-                stopCamera()
-                isCooling = True
-            elif event[4] == 'E':
-                stopCamera()
-                isCooling = True
-                
-        if event[3] == 'R':
-            if event[4] == '1':
-                powerTimeout = None
-                isClosing = False
-                startCamera()
-            elif event[4] == '0':
-                stopCamera()
-                sendDisconnect()
-            elif event[4] == 'R':
-                if isPowered:
-                    sendDisconnect()
-                else:
-                    powerTimeout = None
-                    
-        sendUART(event)
+    def doorOpen(self):
+        if isPaused:
+            print('Door open: Resume');
+            sendOcto('job', '{ "command": "pause", "action": "resume" }')
+
+    def doorClosed(self):
+        if not isPaused:
+            print('Door closed: Pause');
+            sendOcto('job', '{ "command": "pause", "action": "pause" }')
+        if not isPowered:
+            stopCamera()
+
+    def processOFF(self, state, command):
+        if command == 'R1':
+            writeIndex(True);
+            self.state = State.POWERON
+            self.o.connect()
+            self.setTimeout(15)
+        elif command == 'TL':
+            sendUART('KR:R1')
+            self.setTimeout(15)
+        elif self.isTimedout():
+            sendUART('KR:R?')
+            self.setTimeout(15)
+
+    def processON(self, state, command):
+        if command == 'TL':
+            sendUART('KR:R0')
+        elif command == 'R0':
+            writeIndex(False);
+            self.state = State.OFF
+        elif state == 'Offline' :
+            if self.isTimedout():
+                self.o.connect()
+                self.setTimeout(15)
+        elif state.startswith('Printing'):
+            sendUART('KR:PS')
+            self.state = State.PRINTING
+        else:
+            self.timeout = None
+            self.state = State.IDLE
+
+    def processIDLE(self, state, command):
+        if command == 'TL':
+            self.o.disconnect()
+            sendUART('KR:R0')
+        elif command == 'R0':
+            writeIndex(False);
+            self.state = State.OFF
+        elif state.startswith('Printing'):
+            sendUART('KR:PS')
+            self.state = State.PRINTING
+        elif state == 'Disconnected':
+            self.state = State.POWERON
             
-    free_lib(lock, erase=True);
+    def processPRINTING(self, state, command):
+        if command == 'TL':
+            sendUART('KR:PE')
+            self.o.cancel()
+        elif not state.startswith('Printing'):
+            sendUART('KR:PE')
+            self.state = State.COOLING
+
+    def processCOOLING(self, state, command):
+        if command == 'TL':
+            self.o.disconnect()
+            sendUART('KR:R0')
+        elif command == 'R0':
+            writeIndex(False);
+            self.state = State.OFF
+        else:
+            tempExt, tempBed = self.o.getTemps()
+            if tempBed <= 32.0:
+                self.o.disconnect()
+                sendUART('KR:R0')
+                self.state = State.COLD
+                self.setTimeout(5)
+
+    def processCOLD(self, state, command):
+        if command == 'R0':
+            writeIndex(False);
+            self.state = State.OFF
+            self.timeout = None
+        elif self.isTimedout():
+            sendUART('KR:R0')
+            self.setTimeout(5)
+
+    def displayState(self, state):
+        lcd.lcd_display_string(1, state)
+
+    def displayTemps(self):
+        tempExt, tempBed = self.o.getTemps()
+        if tempBed > 0:
+            lcd.lcd_display_string(2, f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
+            print(f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
+
+    def displayJob(self):
+        filename, fileEstimate, donePercent, currentTime, remainingTime = self.o.getJobInfo()
+        lcd.lcd_display_string(1, filename)
+
+        if currentTime != 0:
+            lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{donePercent:5.1f}%')
+
+            eta2 = eta1 = datetime.now()
+            if remainingTime != 0:
+                eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
+            if fileEstimate != 0:
+                eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
+            if eta2 < eta1:
+                eta = eta2
+                eta2 = eta1
+                eta1 = eta
+
+            eta1s = "..:.."
+            if eta1 > datetime.now(): eta1s = eta1.strftime("%H:%M")
+            eta2s = "..:.."
+            if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
+
+            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
+                
+    def loop(self):
+        state = self.o.getState()
+        command = readUART()
+
+        print(f'{self.state} -> "{state}", "{command}"')
+        
+        if self.state == State.OFF:
+            self.processOFF(state, command)
+        elif self.state == State.POWERON:
+            self.processON(state, command)
+        elif self.state == State.IDLE:
+            self.processIDLE(state, command)
+        elif self.state == State.PRINTING:
+            self.processPRINTING(state, command)
+        elif self.state == State.COOLING:
+            self.processCOOLING(state, command)
+        elif self.state == State.COLD:
+            self.processCOLD(state, command)
+
+        if self.state == State.OFF:
+            self.displayState('OFF')
+        elif self.state == State.POWERON:
+            self.displayState(state)
+            self.displayTemps()
+        elif self.state == State.IDLE:
+            self.displayState(state)
+            self.displayTemps()
+        elif self.state == State.PRINTING:
+            self.displayJob()
+            self.displayTemps()
+        elif self.state == State.COOLING:
+            self.displayState('Cooling')
+            self.displayTemps()
+        elif self.state == State.COLD:
+            self.displayState('Cold')
+            self.displayTemps()
+            
+o = Octobox()
 
 while(True):
-    readUART()
-    readOcto()
-    readEvent()
-
-    if powerTimeout is not None:
-        if datetime.now() > powerTimeout:
-            powerTimeout = None
-            sendUART("KR:R0")
-    
+    o.loop()
     sleep(1)
