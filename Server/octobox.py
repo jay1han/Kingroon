@@ -19,24 +19,69 @@ if match is not None:
 else:
     my_ip = 'localhost'
 
-def writeIndex(isPowered):
-    if isPowered:
-        statusText  = 'Printer On'
-        switchButton = 'Turn Off'
-    else:
-        statusText  = 'Printer Off'
-        switchButton = 'Turn On'
-        
-    with open('/usr/share/octobox/index.html') as source:
-        html = source.read()
-    with open('/var/www/html/index.html', 'w+') as target:
-        target.write(html\
-                     .replace('{localIP}', my_ip)\
-                     .replace('{statusText}', statusText)\
-                     .replace('{switchButton}', switchButton)\
-                     )
+class Display:
+    def __init__(self):
+        self.temps = (0, 0)
+        self.jobInfo = ('', 0, 0.0, 0, 0)
+        self.setPowered(False)
 
-writeIndex(False)
+    def setPowered(self, isPowered):
+        self.isPowered = isPowered
+        if self.isPowered:
+            statusText  = 'Printer On'
+            switchButton = 'Turn Off'
+        else:
+            statusText  = 'Printer Off'
+            switchButton = 'Turn On'
+
+        with open('/usr/share/octobox/index.html') as source:
+            html = source.read()
+        with open('/var/www/html/index.html', 'w+') as target:
+            target.write(html\
+                         .replace('{localIP}', my_ip)\
+                         .replace('{statusText}', statusText)\
+                         .replace('{switchButton}', switchButton)\
+                         )
+
+    def setTemps(self, temps):
+        self.temps = temps
+        tempExt, tempBed = self.temps
+        temps = ''
+        if tempExt != 0:
+            temps = f'Printer: {tempExt:.1f}&deg;/{tempBed:.1f}&deg;'
+
+        with open('/var/www/html/temps', 'w') as target:
+            print(temps, file=target)
+        
+    def setJobInfo(self, jobInfo):
+        self.jobInfo = jobInfo
+        filename, fileEstimate, donePercent, currentTime, remainingTime = self.jobInfo
+        jobInfo = ''
+        if filename != '':
+            jobInfo = f'File: {filename}<br>'
+
+        if currentTime > 0:
+            jobInfo += f'Elapsed: {printTime(currentTime)} @{donePercent:.1f}%<br>'
+
+            eta2 = eta1 = datetime.now()
+            if remainingTime != 0:
+                eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
+            if fileEstimate != 0:
+                eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
+            if eta2 < eta1:
+                eta = eta2
+                eta2 = eta1
+                eta1 = eta
+
+            eta1s = "(exceeded)"
+            if eta1 > datetime.now(): eta1s = eta1.strftime("%H:%M")
+            eta2s = "(exceeded)"
+            if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
+            jobInfo += f'ETA: {eta1s} ~ {eta2s}<br>Now: {datetime.now().strftime("%H:%M")}'
+
+        with open('/var/www/html/jobInfo', 'w') as target:
+            print(jobInfo, file=target)
+        
 
 list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'], capture_output=True, text=True).stdout.splitlines()
 
@@ -180,6 +225,7 @@ class Octobox:
         self.state = State.OFF
         self.timeout = None
         self.o = Octoprint()
+        self.d = Display()
         sendUART('KR:R?')
         self.setTimeout(15)
 
@@ -209,24 +255,24 @@ class Octobox:
         if not isPowered:
             stopCamera()
 
-    def processOFF(self, state, command):
+    def processOFF(self, state, command, event):
         if command == 'R1':
-            writeIndex(True);
+            self.d.setPowered(True);
             self.state = State.POWERON
             self.o.connect()
             self.setTimeout(15)
-        elif command == 'TL':
+        elif command == 'TL' or event == 'RR':
             sendUART('KR:R1')
             self.setTimeout(15)
         elif self.isTimedout():
             sendUART('KR:R?')
             self.setTimeout(15)
 
-    def processON(self, state, command):
-        if command == 'TL':
+    def processON(self, state, command, event):
+        if command == 'TL' or event == 'RR':
             sendUART('KR:R0')
         elif command == 'R0':
-            writeIndex(False);
+            self.d.setPowered(False);
             self.state = State.OFF
         elif state == 'Offline' :
             if self.isTimedout():
@@ -239,12 +285,12 @@ class Octobox:
             self.timeout = None
             self.state = State.IDLE
 
-    def processIDLE(self, state, command):
-        if command == 'TL':
+    def processIDLE(self, state, command, event):
+        if command == 'TL' or event == 'RR':
             self.o.disconnect()
             sendUART('KR:R0')
         elif command == 'R0':
-            writeIndex(False);
+            self.d.setPowered(False);
             self.state = State.OFF
         elif state.startswith('Printing'):
             sendUART('KR:PS')
@@ -252,20 +298,20 @@ class Octobox:
         elif state == 'Disconnected':
             self.state = State.POWERON
             
-    def processPRINTING(self, state, command):
-        if command == 'TL':
+    def processPRINTING(self, state, command, event):
+        if command == 'TL' or event == 'RR':
             sendUART('KR:PE')
             self.o.cancel()
         elif not state.startswith('Printing'):
             sendUART('KR:PE')
             self.state = State.COOLING
 
-    def processCOOLING(self, state, command):
-        if command == 'TL':
+    def processCOOLING(self, state, command, event):
+        if command == 'TL' or event == 'RR':
             self.o.disconnect()
             sendUART('KR:R0')
         elif command == 'R0':
-            writeIndex(False);
+            self.d.setPowered(False);
             self.state = State.OFF
         else:
             tempExt, tempBed = self.o.getTemps()
@@ -275,9 +321,9 @@ class Octobox:
                 self.state = State.COLD
                 self.setTimeout(5)
 
-    def processCOLD(self, state, command):
+    def processCOLD(self, state, command, event):
         if command == 'R0':
-            writeIndex(False);
+            self.d.setPowered(False);
             self.state = State.OFF
             self.timeout = None
         elif self.isTimedout():
@@ -292,6 +338,7 @@ class Octobox:
         if tempBed > 0:
             lcd.lcd_display_string(2, f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
             print(f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
+            self.d.setTemps((tempExt, tempBed))
 
     def displayJob(self):
         filename, fileEstimate, donePercent, currentTime, remainingTime = self.o.getJobInfo()
@@ -316,25 +363,27 @@ class Octobox:
             if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
 
             lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
+            self.d.setJobInfo((filename, fileEstimate, donePercent, currentTime, remainingTime))
                 
     def loop(self):
         state = self.o.getState()
         command = readUART()
+        event = readEvent()
 
         print(f'{self.state} -> "{state}", "{command}"')
         
         if self.state == State.OFF:
-            self.processOFF(state, command)
+            self.processOFF(state, command, event)
         elif self.state == State.POWERON:
-            self.processON(state, command)
+            self.processON(state, command, event)
         elif self.state == State.IDLE:
-            self.processIDLE(state, command)
+            self.processIDLE(state, command, event)
         elif self.state == State.PRINTING:
-            self.processPRINTING(state, command)
+            self.processPRINTING(state, command, event)
         elif self.state == State.COOLING:
-            self.processCOOLING(state, command)
+            self.processCOOLING(state, command, event)
         elif self.state == State.COLD:
-            self.processCOLD(state, command)
+            self.processCOLD(state, command, event)
 
         if self.state == State.OFF:
             self.displayState('OFF')

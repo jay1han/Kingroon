@@ -38,26 +38,34 @@
                   if (status == 200) {
                       location.reload(true);
                   } else {
-                      setupPromise();
+                      setTimeout(checkPage, 1000);
                   }
               }
           );
       }
-
-      function setupPromise() {
-          setTimeout(checkPage, 1000);
+      
+      async function getUpdate() {
+          let temps = await fetch("temps", { cache: 'no-cache', mode: 'no-cors' });
+          let tempsText = await temps.text();
+          let jobInfo = await fetch("jobInfo", { cache: 'no-cache', mode: 'no-cors' });
+          let jobInfoText = await jobInfo.text();
+          
+          document.getElementById("temps").innerHTML = tempsText;
+          document.getElementById("jobInfo").innerHTML = jobInfoText;
+      
+          setTimeout(getUpdate, 1000);
       }
 
       function setup() {
           let port = window.location.port;
-          document.getElementById("log").innerHTML = port;
           if (port == 8000 || port == 60080) {
               document.getElementById("webcam").src = "http://jayhan.name:60088/?action=stream";
           } else {
               document.getElementById("webcam").src = "http://{localIP}:8080/?action=stream";
           }
 
-          setupPromise();
+          setTimeout(checkPage, 1000);
+          setTimeout(getUpdate, 1000);
       }
       
       window.addEventListener("load", setup);
@@ -75,8 +83,9 @@
         <button type="submit" name="action" value="camera">Camera</button>
         <button type="submit" name="action" value="light">Light</button>
       </form>
+      <p id="temps"></p>
+      <p id="jobInfo"></p>
       <img id="webcam" style="transform: rotate(180deg);" src="" />
     </center>
-    <p id="log"></p>
   </body>
 </html>
