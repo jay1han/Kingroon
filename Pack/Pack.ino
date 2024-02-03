@@ -96,7 +96,6 @@ void sendStrip(Strip *strip, byte r, byte g, byte b) {
 
 char ackMessage[8];
 time_t responseTimeout = 0;
-time_t heartbeatTimeout = 0;
 
 #define CAMERA_ON       0
 #define CAMERA_DARK     1
@@ -254,10 +253,15 @@ void setBuzzer(int tone) {
 }
 
 int setRelay(int command) {
-    static int state;
+    static int state = 0;
     
     Serial.printf("Relay command %d, state %d", command, state);
-    if (command < 0) state = 1 - state;
+    if (command < 0) {
+        Serial1.printf("KR:R%d\n", state);
+        return state;
+    }
+    
+    if (command > 1) state = 1 - state;
     else state = command;
     Serial.printf(" -> %d\n", state);
 
@@ -265,12 +269,14 @@ int setRelay(int command) {
         setBuzzer(BUZZ_DOOR);
         state = 0;
         digitalWrite(PIN_RELAY, 0);
+        Serial1.printf("KR:R%d\n", state);
         return -1;
     }
 
     if (state == 1) digitalWrite(PIN_RELAY, 1);
     else digitalWrite(PIN_RELAY, 0);
     Serial1.printf("KR:R%d\n", state);
+    Serial.printf("Report KR:R%d\n", state);
     
     isPowered = state;
     if (!isPowered) isPrinting = false;
@@ -348,7 +354,6 @@ void setup() {
 
     Serial1.begin(9600, SERIAL_8N1, PI_RX, PI_TX);
     Serial1.print("\n\n\nKR:R0\n");
-    heartbeatTimeout = time(NULL) + 60;
 }
 
 #define DOOR_OPEN     1
@@ -538,21 +543,17 @@ void loop() {
             if (message[4] == '1') {
                 if (!isDoorOpen) {
                     setBuzzer(BUZZ_DOOR);
-                    Serial1.print("KR:R0\n");
+                    Serial1.print("KR:DC\n");
                 } else {
                     setRelay(1);
-                    Serial1.print("KR:ok\n");
                 }
             } else if (message[4] == '0') {
                 setRelay(0);
                 setBuzzer(BUZZ_END);
-                Serial1.print("KR:ok\n");
+            } else if (message[4] == '?') {
+                setRelay(-1);
             } else {
-                if (setRelay(-1) == -1) {
-                    Serial1.print("KR:R0\n");
-                } else {
-                    Serial1.print("KR:ok\n");
-                }
+                setRelay(2);
             }
             break;
 
@@ -577,11 +578,5 @@ void loop() {
 
     if (millis() > buzzerTimer) {
         setBuzzer(BUZZ_CONTINUE);
-    }
-
-    if (time(NULL) > heartbeatTimeout) {
-        Serial1.printf("KR:R%d\n", isPowered ? 1 : 0);
-        heartbeatTimeout = time(NULL) + 60;
-        Serial.printf("Heartbeat KR:R%d\n", isPowered ? 1 : 0);
     }
 }
