@@ -1,70 +1,38 @@
 <html>
   <head>
+    <style>
+      body {font-family:"Arial", "Helvetica", "Verdana", "Calibri", sans-serif; hyphens:manual;}
+      table,th,tr,td {border:0; padding:0.2em 1em 0.2em 1em; margin:0; border-collapse:collapse; text-align:left; align:center;}
+      button {font-size: large;}
+    </style>
+    
     <script>
-      
-      function checkPage() {
-          const DayOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-          const MonthName = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-      
-          let refreshPromise = new Promise(
-              function(result, reject) {
-                  // This is really painful...
-                  // If-Modified-Since: <day-name>, <day> <month-name> <year> <hour>:<minute>:<second> GMT
-                  let docLastModifDate = new Date(document.lastModified);
-                  let docRequestedDate = new Date(docLastModifDate.getTime() + 1000)
-                  let docRequestedHTTPString =
-                      DayOfWeek[docRequestedDate.getUTCDay()] + ", " +
-                      docRequestedDate.getUTCDate().toString().padStart(2, "0") + " " +
-                      MonthName[docRequestedDate.getUTCMonth()] + " " +
-                      docRequestedDate.getUTCFullYear().toString() + " " +
-                      docRequestedDate.getUTCHours().toString().padStart(2, "0") + ":" +
-                      docRequestedDate.getUTCMinutes().toString().padStart(2, "0") + ":" +
-                      docRequestedDate.getUTCSeconds().toString().padStart(2, "0") + " GMT";
-                  
-                  var http = new XMLHttpRequest();
-                  http.open("HEAD", document.URL);
-                  http.setRequestHeader("If-Modified-Since", docRequestedHTTPString);
-                  http.onreadystatechange = function() {
-                      if (this.readyState == this.DONE) {
-                          result(this.status);
-                      }
-                  }
-                  http.send();
-              }
-          );
-          
-          refreshPromise.then(
-              function(status) {
-                  if (status == 200) {
-                      location.reload(true);
-                  } else {
-                      setTimeout(checkPage, 1000);
-                  }
-              }
-          );
-      }
-      
       async function getUpdate() {
+          let state = await fetch("state", { cache: 'no-cache', mode: 'no-cors' });
+          let stateText = await state.text();
           let temps = await fetch("temps", { cache: 'no-cache', mode: 'no-cors' });
           let tempsText = await temps.text();
           let jobInfo = await fetch("jobInfo", { cache: 'no-cache', mode: 'no-cors' });
           let jobInfoText = await jobInfo.text();
           
+          document.getElementById("state").innerHTML = stateText;
           document.getElementById("temps").innerHTML = tempsText;
           document.getElementById("jobInfo").innerHTML = jobInfoText;
       
           setTimeout(getUpdate, 1000);
       }
 
-      function setup() {
+      async function setup() {
+          let localIP = await fetch("localIP", { cache: 'no-cache', mode: 'no-cors' });
+          let localIPText = await localIP.text();
+          
           let port = window.location.port;
           if (port == 8000 || port == 60080) {
               document.getElementById("webcam").src = "http://jayhan.name:60088/?action=stream";
           } else {
-              document.getElementById("webcam").src = "http://{localIP}:8080/?action=stream";
+              document.getElementById("webcam").src = `http://${localIPText}:8080/?action=stream`;
           }
 
-          setTimeout(checkPage, 1000);
           setTimeout(getUpdate, 1000);
       }
       
@@ -77,15 +45,24 @@
   
   <body>
     <center>
-      <h1>{statusText}</h1>
-      <form action="/bin/octocgi.py">
-        <button type="submit" name="action" value="switch">{switchButton}</button>
-        <button type="submit" name="action" value="camera">Camera</button>
-        <button type="submit" name="action" value="light">Light</button>
-      </form>
-      <p id="temps"></p>
-      <p id="jobInfo"></p>
-      <img id="webcam" style="transform: rotate(180deg);" src="" />
+      <h1 id="state">Printer</h1>
+      <table>
+        <tr>
+          <td style="text-align:center">
+            <form action="/bin/octocgi.py">
+              <button type="submit" name="action" value="switch">Power</button>
+              <button type="submit" name="action" value="camera">Camera</button>
+              <button type="submit" name="action" value="light">Light</button>
+            </form>
+          </td>
+          <td rowspan=2>
+            <table id="jobInfo"></table>
+          </td>
+        </tr><tr>
+          <td><table id="temps"></table></td>
+        </tr>
+      </table>
+      <p><img id="webcam" style="transform: rotate(180deg);" src="" /></p>
     </center>
   </body>
 </html>
