@@ -551,7 +551,6 @@ void loop() {
                 }
             } else if (message[4] == '0') {
                 setRelay(0);
-                setBuzzer(BUZZ_END);
             } else if (message[4] == '?') {
                 setRelay(-1);
             } else {
