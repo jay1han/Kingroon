@@ -269,7 +269,9 @@ int setRelay(int command) {
         setBuzzer(BUZZ_DOOR);
         state = 0;
         digitalWrite(PIN_RELAY, 0);
-        Serial1.printf("KR:R%d\n", state);
+        Serial1.print("KR:DC\n");
+        Serial1.print("KR:R0\n");
+        Serial.print("Report KR:DC\n");
         return -1;
     }
 
@@ -554,6 +556,16 @@ void loop() {
                 setRelay(-1);
             } else {
                 setRelay(2);
+            }
+            break;
+
+        case 'D':
+            if (message[4] == '?') {
+                if (isDoorOpen) {
+                    Serial1.print("KR:DO\n");
+                } else {
+                    Serial1.print("KR:DC\n");
+                }
             }
             break;
 
