@@ -419,6 +419,8 @@ class Octobox:
             self.processCOOLING(state, command, event)
         elif self.state == State.COLD:
             self.processCOLD(state, command, event)
+        elif self.state == State.CLOSED:
+            self.processCLOSED(state, command, event)
 
         if self.state == State.OFF:
             self.displayState('Printer Off')
@@ -437,6 +439,8 @@ class Octobox:
         elif self.state == State.COLD:
             self.displayState('Cold')
             self.displayTemps()
+        elif self.state == State.CLOSED:
+            self.displayState('Door Closed')
             
 o = Octobox()
 
