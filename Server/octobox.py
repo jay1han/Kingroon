@@ -339,6 +339,10 @@ class Octobox:
             self.d.setState('Door Closed')
             self.state = State.CLOSED
             sendUART('KR:R0')
+        elif state == 'Printing':
+            sendUART('KR:PS')
+            self.state = State.PRINTING
+            self.timeout = None
         else:
             tempExt, tempBed = self.o.getTemps()
             if tempBed <= 32.0:
@@ -351,6 +355,7 @@ class Octobox:
     def processCOLD(self, state, command, event):
         if command == 'R0':
             self.d.setState('Printer Off')
+            sendUART('KR:L0')
             self.state = State.OFF
             self.timeout = None
         elif command == 'DC':
