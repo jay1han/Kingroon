@@ -22,7 +22,7 @@ else:
 with open('/var/www/html/localIP', 'w') as target:
     print(my_ip, file=target)
 
-NO_TEMPS   = (0, 0)
+NO_TEMPS   = (0.0, 0.0, 0.0, 0.0)
 NO_JOBINFO = ('', 0, 0.0, 0, 0)
 
 class Display:
@@ -36,10 +36,9 @@ class Display:
 
     def setTemps(self, temps):
         self.temps = temps
-        tempExt, tempBed = self.temps
-        temps = ''
-        if tempExt != 0:
-            temps = f'<tr><td rowspan=2>Printer</td><td>Extruder</td><td>{tempExt:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed:.1f}&deg;</td></tr>'
+        tempExt, tempBed, tempCpu, tempEnv = self.temps
+        temps = f'<tr><td rowspan=2>Printer</td><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
+        temps += f'<tr><td>CPU</td><td></td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
@@ -111,6 +110,10 @@ def printTime(seconds):
     if seconds == 0:
         return '..:..'
     return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
+
+def readCpuTemp():
+    with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
+        return int(temp.read().strip()) / 1000.0
 
 def readEvent():
     lock = lock_lib()
@@ -346,12 +349,13 @@ class Octobox:
         else:
             tempExt, tempBed = self.o.getTemps()
             if tempBed <= 32.0:
-                self.o.disconnect()
                 sendUART('KR:B2')
-                sendUART('KR:R0')
+                self.o.disconnect()
                 self.state = State.COLD
                 self.setTimeout(5)
-
+                sleep(1)
+                sendUART('KR:R0')
+                
     def processCOLD(self, state, command, event):
         if command == 'R0':
             self.d.setState('Printer Off')
@@ -373,10 +377,9 @@ class Octobox:
 
     def displayTemps(self):
         tempExt, tempBed = self.o.getTemps()
-        if tempBed > 0:
-            lcd.lcd_display_string(2, f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
-            print(f'Pr:{tempExt + 0.5:3.0f}/{tempBed+0.5:2.0f} Env:00/00%')
-            self.d.setTemps((tempExt, tempBed))
+        tempCpu = readCpuTemp()
+        lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} Cpu:{tempCpu+0.5:2.0f} Env: 0')
+        self.d.setTemps((tempExt, tempBed, tempCpu, 0))
 
     def displayJob(self):
         filename, fileEstimate, donePercent, currentTime, remainingTime = self.o.getJobInfo()
