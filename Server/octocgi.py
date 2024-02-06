@@ -22,4 +22,4 @@ elif action == 'camera':
 elif action == 'light':
     lock_write('LL')
 
-print('Location: \\\n\n')
+print("Location: \\\n\n")

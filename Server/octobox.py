@@ -40,21 +40,20 @@ class Display:
     def setTemps(self, temps):
         tempExt, tempBed, tempCpu, tempEnv = temps
         if tempExt == 0.0:
-            temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
+            temps = f'<tr><td>Extruder</td><td> </td></tr><tr><td>Bed</td><td> </td></tr>'
         else:
             temps = f'<tr><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
         temps += f'<tr><td>CPU</td><td></td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
         if tempEnv == 0.0:
-            temps += f'<tr><td>Env</td><td></td><td></td></tr>'
+            temps += f'<tr><td>Env</td><td> </td><td> </td></tr>'
         else:
-            temps += f'<tr><td>Env</td><td></td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
+            temps += f'<tr><td>Env</td><td> </td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
         
     def setJobInfo(self, jobInfo):
         filename, currentTime, remainingTime, fileEstimate, donePercent = jobInfo
-        jobInfoText = ''
         if filename != '':
             jobInfoText = f'<tr><td>File</td><td>{filename}</td></tr>'
         else:
@@ -85,11 +84,11 @@ class Display:
             
         else:
             jobInfoText += f'<tr><td>Elapsed</td><td>{printTime0(self.jobInfo[1])}</td></tr>'
-            jobInfoText += f'<tr><td>ETA</td><td></td></tr>'
+            jobInfoText += f'<tr><td>ETA</td><td> </td></tr>'
             if self.jobInfo[0] != '':
                 jobInfoText += f'<tr><td>Ended</td><td>{self.lastNow}</td></tr>'
             else:
-                jobInfoText += f'<tr><td>Ended</td><td></td></tr>'
+                jobInfoText += f'<tr><td>Ended</td><td> </td></tr>'
 
         self.jobInfo = jobInfo
         with open('/var/www/html/jobInfo', 'w') as target:
@@ -136,12 +135,13 @@ class Webcam:
                        '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 640x480',
                        '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
         self.Popen = subprocess.Popen(webcamPopen)
-        print(f'Started webcam process {webcam.pid}')
+        print(f'Started webcam process {self.Popen.pid}')
 
     def stop(self):
         if self.Popen is not None:
             self.Popen.terminate()
             self.Popen = None
+            sleep(1)
         self.capture()
 
     def capture(self):
