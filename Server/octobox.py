@@ -131,6 +131,7 @@ class Webcam:
         self.capture()
         
     def start(self):
+        sendUART('KR:C1')
         webcamPopen = ['/usr/local/bin/mjpg_streamer',
                        '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 640x480',
                        '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
@@ -143,6 +144,7 @@ class Webcam:
             self.Popen = None
             sleep(1)
         self.capture()
+        sendUART('KR:C0')
 
     def capture(self):
         subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '640x480', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
