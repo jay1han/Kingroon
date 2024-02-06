@@ -10,24 +10,27 @@ lcd.lcd_display_string(1, "Octobox")
 #################################################################
 # Get the webcam
 
-import subprocess, re
+import subprocess, re, os, signal
 
-list_if = subprocess.run(['/usr/bin/ip', 'addr'], capture_output=True, text=True).stdout
-match = re.search('inet 192\.168\.([.0-9]+)', list_if, flags=re.MULTILINE)
-if match is not None:
-    my_ip = f'192.168.{match.group(1)}'
-else:
-    my_ip = 'localhost'
+def printTime0(seconds):
+    if seconds == 0:
+        return ''
+    return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
-with open('/var/www/html/localIP', 'w') as target:
-    print(my_ip, file=target)
+def printTime(seconds):
+    text = printTime0(seconds)
+    if text == '':
+        return '..:..'
+    return text
 
 NO_TEMPS   = (0.0, 0.0, 0.0, 0.0)
-NO_JOBINFO = ('', 0, 0.0, 0, 0)
+NO_JOBINFO = ('', 0, 0, 0, 0.0)
 
 class Display:
     def __init__(self):
         self.setState('Printer')
+        self.jobInfo = NO_JOBINFO
+        self.lastNow = datetime.now().strftime("%H:%M")
         self.clearInfo()
 
     def setState(self, statusText):
@@ -35,23 +38,30 @@ class Display:
             print(statusText, file=target)
 
     def setTemps(self, temps):
-        self.temps = temps
-        tempExt, tempBed, tempCpu, tempEnv = self.temps
-        temps = f'<tr><td rowspan=2>Printer</td><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
+        tempExt, tempBed, tempCpu, tempEnv = temps
+        if tempExt == 0.0:
+            temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
+        else:
+            temps = f'<tr><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
         temps += f'<tr><td>CPU</td><td></td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
+        if tempEnv == 0.0:
+            temps += f'<tr><td>Env</td><td></td><td></td></tr>'
+        else:
+            temps += f'<tr><td>Env</td><td></td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
         
     def setJobInfo(self, jobInfo):
-        self.jobInfo = jobInfo
-        filename, fileEstimate, donePercent, currentTime, remainingTime = self.jobInfo
-        jobInfo = ''
+        filename, currentTime, remainingTime, fileEstimate, donePercent = jobInfo
+        jobInfoText = ''
         if filename != '':
-            jobInfo = f'<tr><td>File</td><td>{filename}</td></tr>'
+            jobInfoText = f'<tr><td>File</td><td>{filename}</td></tr>'
+        else:
+            jobInfoText = f'<tr><td>File</td><td>{self.jobInfo[0]}</td></tr>'
 
         if currentTime > 0:
-            jobInfo += f'<tr><td>Elapsed</td><td>{printTime(currentTime)} ({donePercent:.1f}%)</td></tr>'
+            jobInfoText += f'<tr><td>Elapsed</td><td>{printTime0(currentTime)} ({donePercent:.1f}%)</td></tr>'
 
             eta2 = eta1 = datetime.now()
             if remainingTime != 0:
@@ -69,33 +79,73 @@ class Display:
             elif eta2 > datetime.now():
                 etas = eta2.strftime("%H:%M")
 
-            jobInfo += f'<tr><td>ETA</td><td>{etas}</td></tr>'
-            jobInfo += f'<tr><td>Now</td><td>{datetime.now().strftime("%H:%M")}</td></tr>'
+            jobInfoText += f'<tr><td>ETA</td><td>{etas}</td></tr>'
+            jobInfoText += f'<tr><td>Now</td><td>{datetime.now().strftime("%H:%M")}</td></tr>'
+            self.lastNow = datetime.now().strftime("%H:%M")
+            
+        else:
+            jobInfoText += f'<tr><td>Elapsed</td><td>{printTime0(self.jobInfo[1])}</td></tr>'
+            jobInfoText += f'<tr><td>ETA</td><td></td></tr>'
+            if self.jobInfo[0] != '':
+                jobInfoText += f'<tr><td>Ended</td><td>{self.lastNow}</td></tr>'
+            else:
+                jobInfoText += f'<tr><td>Ended</td><td></td></tr>'
 
+        self.jobInfo = jobInfo
         with open('/var/www/html/jobInfo', 'w') as target:
-            print(jobInfo, file=target)
+            print(jobInfoText, file=target)
 
     def clearInfo(self):
         self.setTemps(NO_TEMPS);
         self.setJobInfo(NO_JOBINFO);
 
-list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'], capture_output=True, text=True).stdout.splitlines()
+def setupIP():
+    list_if = subprocess.run(['/usr/bin/ip', 'addr'], capture_output=True, text=True).stdout
+    match = re.search('inet 192\.168\.([.0-9]+)', list_if, flags=re.MULTILINE)
+    if match is not None:
+        my_ip = f'192.168.{match.group(1)}'
+    else:
+        my_ip = 'localhost'
 
-line_no = 0
-usb_device = 0
-for line in list_devices:
-    line_no += 1
-    if re.search('USB', line):
-        usb_device = line_no
+    with open('/var/www/html/localIP', 'w') as target:
+        print(my_ip, file=target)
 
-device_name = list_devices[usb_device].strip()
-webcamPopen = ['/usr/local/bin/mjpg_streamer',
-               '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {device_name} -n -r 640x480',
-               '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
+class Webcam:
+    def __init__(self):
+        ps = subprocess.run(['/usr/bin/ps', '-C', 'mjpg_streamer', '--no-headers', '-o', 'pid'],
+                            capture_output=True, text=True)\
+                            .stdout.strip()
+        if ps != '':
+            os.kill(int(ps), signal.SIGTERM)
+        self.Popen = None
+        list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'],
+                                      capture_output=True, text=True)\
+                                 .stdout.splitlines()
+        line_no = 0
+        usb_device = 0
+        for line in list_devices:
+            line_no += 1
+            if re.search('USB', line):
+                usb_device = line_no
 
-webcam = subprocess.Popen(webcamPopen)
-print(f'Started webcam process {webcam.pid}')
-lcd.lcd_display_string(2, "Webcam started")
+        self.device = list_devices[usb_device].strip()
+        self.capture()
+        
+    def start(self):
+        webcamPopen = ['/usr/local/bin/mjpg_streamer',
+                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 640x480',
+                       '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
+        self.Popen = subprocess.Popen(webcamPopen)
+        print(f'Started webcam process {webcam.pid}')
+
+    def stop(self):
+        if self.Popen is not None:
+            self.Popen.terminate()
+            self.Popen = None
+        self.capture()
+
+    def capture(self):
+        subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '640x480', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
         
 #################################################################
 # Monitor the UART, Octoprint info and events --> update the display
@@ -105,11 +155,6 @@ from urllib.request import urlopen, Request
 from enum import Enum
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
-
-def printTime(seconds):
-    if seconds == 0:
-        return '..:..'
-    return (datetime.now().replace(hour=0, minute=0, second=0) + timedelta(seconds=int(seconds))).strftime('%H:%M')
 
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
@@ -192,7 +237,7 @@ class Octoprint:
     def getJobInfo(self):
         job = self.query('job')
         if job is None:
-            return '', 0, 0.0, 0, 0
+            return NO_JOBINFO
         else:
             filename = job['job']['file']['name']
             if filename is None:
@@ -227,6 +272,7 @@ class Octobox:
         self.timeout = None
         self.o = Octoprint()
         self.d = Display()
+        self.w = Webcam()
         sendUART('KR:R?')
         self.setTimeout(15)
         sendUART('KR:D?')
@@ -248,6 +294,7 @@ class Octobox:
     def processCLOSED(self, state, command, event):
         if command == 'DO':
             self.d.setState('Printer')
+            self.w.stop()
             self.state = State.OFF
             self.timeout = None
         elif command == 'R1':
@@ -267,6 +314,7 @@ class Octobox:
             self.d.setState('Printer On')
             self.state = State.POWERON
             self.o.connect()
+            self.w.start()
             self.setTimeout(15)
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -283,6 +331,7 @@ class Octobox:
             sendUART('KR:R0')
         elif command == 'R0':
             self.d.setState('Printer Off')
+            self.w.stop()
             self.state = State.OFF
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -305,6 +354,7 @@ class Octobox:
             sendUART('KR:R0')
         elif command == 'R0':
             self.d.setState('Printer Off');
+            self.w.stop()
             self.state = State.OFF
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -337,6 +387,7 @@ class Octobox:
             sendUART('KR:R0')
         elif command == 'R0':
             self.d.setState('Printer Off');
+            self.w.stop()
             self.state = State.OFF
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -360,6 +411,7 @@ class Octobox:
         if command == 'R0':
             self.d.setState('Printer Off')
             sendUART('KR:L0')
+            self.w.stop()
             self.state = State.OFF
             self.timeout = None
         elif command == 'DC':
@@ -378,11 +430,14 @@ class Octobox:
     def displayTemps(self):
         tempExt, tempBed = self.o.getTemps()
         tempCpu = readCpuTemp()
-        lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} Cpu:{tempCpu+0.5:2.0f} Env: 0')
+        if tempExt == 0.0:
+            lcd.lcd_display_string(2, f'       CPU:{tempCpu+0.5:2.0f} Env: 0')
+        else:
+            lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} CPU:{tempCpu+0.5:2.0f} Env: 0')
         self.d.setTemps((tempExt, tempBed, tempCpu, 0))
 
     def displayJob(self):
-        filename, fileEstimate, donePercent, currentTime, remainingTime = self.o.getJobInfo()
+        filename, currentTime, remainingTime, fileEstimate, donePercent = self.o.getJobInfo()
         lcd.lcd_display_string(1, filename)
 
         if currentTime != 0:
@@ -404,7 +459,7 @@ class Octobox:
             if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
 
             lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
-            self.d.setJobInfo((filename, fileEstimate, donePercent, currentTime, remainingTime))
+            self.d.setJobInfo((filename, currentTime, remainingTime, fileEstimate, donePercent))
                 
     def loop(self):
         state = self.o.getState()
@@ -430,28 +485,26 @@ class Octobox:
         elif self.state == State.CLOSED:
             self.processCLOSED(state, command, event)
 
+        self.displayTemps()
+        
         if self.state == State.OFF:
             self.displayState('Printer Off')
         elif self.state == State.POWERON:
             self.displayState(state)
-            self.displayTemps()
         elif self.state == State.IDLE:
             self.displayState(state)
-            self.displayTemps()
         elif self.state == State.PRINTING:
             self.displayJob()
-            self.displayTemps()
         elif self.state == State.COOLING:
             self.displayState('Cooling')
-            self.displayTemps()
         elif self.state == State.COLD:
             self.displayState('Cold')
-            self.displayTemps()
         elif self.state == State.CLOSED:
             self.displayState('Door Closed')
             
-o = Octobox()
+setupIP()            
+octo = Octobox()
 
 while(True):
-    o.loop()
+    octo.loop()
     sleep(1)

@@ -6,7 +6,7 @@
       table,th,tr,td {border:0; padding:0.2em 1em 0.2em 1em; margin:0; border-collapse:collapse; text-align:left; align:center;}
       button {font-size: large;}
     </style>
-    
+
     <script>
       async function getUpdate() {
           let state = await fetch("state", { cache: 'no-cache', mode: 'no-cors' });
@@ -19,11 +19,24 @@
           document.getElementById("state").innerHTML = stateText;
           document.getElementById("temps").innerHTML = tempsText;
           document.getElementById("jobInfo").innerHTML = jobInfoText;
+
+          let value = document.getElementById("webcam").value;
+          if (value == "stream") {
+              if (stateText.startsWith('Printer')) {
+                  setupImage();
+              }
+          } else {
+              if (!stateText.startsWith('Printer')) {
+                  setupStream();
+              }
+          }
       
           setTimeout(getUpdate, 1000);
       }
 
-      async function setup() {
+      async function setupStream() {
+          document.getElementById("webcam").value = "stream";
+          
           let localIP = await fetch("localIP", { cache: 'no-cache', mode: 'no-cors' });
           let localIPText = await localIP.text();
           
@@ -33,7 +46,15 @@
           } else {
               document.getElementById("webcam").src = `http://${localIPText}:8080/?action=stream`;
           }
+      }
 
+      function setupImage() {
+          document.getElementById("webcam").value = "image";
+          document.getElementById("webcam").src = "/image.jpg";
+      }
+
+      function setup() {
+          setupStream()
           setTimeout(getUpdate, 1000);
       }
       
@@ -47,23 +68,24 @@
   <body>
     <center>
       <h1 id="state">Printer</h1>
+      
+      <p>
+        <form action="/bin/octocgi.py">
+          <button type="submit" name="action" value="switch">Power</button>
+          <button type="submit" name="action" value="camera">Camera</button>
+          <button type="submit" name="action" value="light">Light</button>
+        </form>
+      </p>
+      
       <table>
         <tr>
-          <td style="text-align:center">
-            <form action="/bin/octocgi.py">
-              <button type="submit" name="action" value="switch">Power</button>
-              <button type="submit" name="action" value="camera">Camera</button>
-              <button type="submit" name="action" value="light">Light</button>
-            </form>
-          </td>
-          <td rowspan=2>
-            <table id="jobInfo"></table>
-          </td>
-        </tr><tr>
           <td><table id="temps"></table></td>
+          <td><table id="jobInfo"></table></td>
         </tr>
       </table>
-      <p><img id="webcam" style="transform: rotate(180deg);" src="" /></p>
+      
+      <p><img id="webcam" style="transform: rotate(180deg);" src="/image.jpg" value="image" /></p>
+      
     </center>
   </body>
 </html>
