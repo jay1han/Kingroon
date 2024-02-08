@@ -40,14 +40,14 @@ class Display:
     def setTemps(self, temps):
         tempExt, tempBed, tempCpu, tempEnv = temps
         if tempExt == 0.0:
-            temps = f'<tr><td>Extruder</td><td> </td></tr><tr><td>Bed</td><td> </td></tr>'
+            temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
         else:
             temps = f'<tr><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
-        temps += f'<tr><td>CPU</td><td></td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
+        temps += f'<tr><td>CPU</td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
         if tempEnv == 0.0:
-            temps += f'<tr><td>Env</td><td> </td><td> </td></tr>'
+            temps += f'<tr><td>Env</td><td></td></tr>'
         else:
-            temps += f'<tr><td>Env</td><td> </td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
+            temps += f'<tr><td>Env</td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
@@ -257,7 +257,7 @@ class Octoprint:
             if currentTime is None: currentTime = 0
             if remainingTime is None: remainingTime = 0
 
-            return filename, fileEstimate, donePercent, currentTime, remainingTime
+            return filename, currentTime, remainingTime, fileEstimate, donePercent
 
 class State(Enum):
     OFF      = 0
@@ -365,6 +365,7 @@ class Octobox:
             self.state = State.CLOSED
         elif state.startswith('Printing'):
             sendUART('KR:PS')
+            self.d.setJobInfo(NO_JOBINFO);
             self.state = State.PRINTING
         elif state == 'Disconnected':
             self.state = State.POWERON
@@ -401,7 +402,7 @@ class Octobox:
             self.timeout = None
         else:
             tempExt, tempBed = self.o.getTemps()
-            if tempBed <= 32.0:
+            if tempBed < 30.0:
                 sendUART('KR:B2')
                 self.o.disconnect()
                 self.state = State.COLD
