@@ -20,14 +20,14 @@
           document.getElementById("temps").innerHTML = tempsText;
           document.getElementById("jobInfo").innerHTML = jobInfoText;
 
-          let value = document.getElementById("webcam").value;
-          if (value == "stream") {
-              if (stateText.startsWith('Printer')) {
-                  setupImage();
+          let value = document.getElementById("webcam").src;
+          if (value.endsWith("jpg")) {
+              if (!stateText.startsWith("Printer")) {
+                  setupStream();
               }
           } else {
-              if (!stateText.startsWith('Printer')) {
-                  setupStream();
+              if (stateText.startsWith("Printer")) {
+                  setupImage();
               }
           }
       
@@ -35,8 +35,6 @@
       }
 
       async function setupStream() {
-          document.getElementById("webcam").value = "stream";
-          
           let localIP = await fetch("localIP", { cache: 'no-cache', mode: 'no-cors' });
           let localIPText = await localIP.text();
           
@@ -49,12 +47,10 @@
       }
 
       function setupImage() {
-          document.getElementById("webcam").value = "image";
-          document.getElementById("webcam").src = "/image.jpg";
+          document.getElementById("webcam").src = "image.jpg";
       }
 
       function setup() {
-          setupStream()
           getUpdate();
       }
       
@@ -84,8 +80,10 @@
         </tr>
       </table>
       
-      <p><img id="webcam" style="transform: rotate(180deg);" src="/image.jpg" value="image" /></p>
+      <p><img id="webcam" style="transform: rotate(180deg);" src="image.jpg" /></p>
       
     </center>
+
+    <p id="log"></p>
   </body>
 </html>
