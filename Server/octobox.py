@@ -443,7 +443,7 @@ class Octobox:
 
     def displayJob(self):
         filename, currentTime, remainingTime, fileEstimate, donePercent = self.o.getJobInfo()
-        lcd.lcd_display_string(1, filename)
+        lcd.lcd_display_string(1, filename[-20:])
 
         if currentTime != 0:
             lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{donePercent:5.1f}%')
