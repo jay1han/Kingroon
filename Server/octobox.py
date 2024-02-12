@@ -115,6 +115,7 @@ class Webcam:
                             capture_output=True, text=True)\
                             .stdout.strip()
         if ps != '':
+            print(f'Kill streamer PID={ps}')
             os.kill(int(ps), signal.SIGTERM)
         self.Popen = None
         list_devices = subprocess.run(['/usr/bin/v4l2-ctl', '--list-devices'],
@@ -140,6 +141,7 @@ class Webcam:
 
     def stop(self):
         if self.Popen is not None:
+            print('Stop streamer')
             self.Popen.terminate()
             self.Popen = None
             sleep(1)
@@ -295,8 +297,8 @@ class Octobox:
     
     def processCLOSED(self, state, command, event):
         if command == 'DO':
-            self.d.setState('Printer')
             self.w.stop()
+            self.d.setState('Printer')
             self.state = State.OFF
             self.timeout = None
         elif command == 'R1':
@@ -332,8 +334,8 @@ class Octobox:
         if command == 'TL' or event == 'RR':
             sendUART('KR:R0')
         elif command == 'R0':
-            self.d.setState('Printer Off')
             self.w.stop()
+            self.d.setState('Printer Off')
             self.state = State.OFF
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -389,8 +391,8 @@ class Octobox:
             self.o.disconnect()
             sendUART('KR:R0')
         elif command == 'R0':
-            self.d.setState('Printer Off');
             self.w.stop()
+            self.d.setState('Printer Off');
             self.state = State.OFF
         elif command == 'DC':
             self.d.setState('Door Closed')
@@ -412,9 +414,9 @@ class Octobox:
                 
     def processCOLD(self, state, command, event):
         if command == 'R0':
+            self.w.stop()
             self.d.setState('Printer Off')
             sendUART('KR:L0')
-            self.w.stop()
             self.state = State.OFF
             self.timeout = None
         elif command == 'DC':
