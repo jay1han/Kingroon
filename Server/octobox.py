@@ -51,6 +51,12 @@ class Display:
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
+
+    def setElapsed(self, currentTime):
+        jobInfoText = '<tr><td>File</td><td></td></tr>'
+        jobInfoText += f'<tr><td>Elapsed</td><td>{printTime0(currentTime)}</td></tr>'
+        jobInfoText += '<tr><td>ETA</td><td></td></tr>'
+        jobInfoText += f'<tr><td>Now</td><td>{self.lastNow}</td></tr>'
         
     def setJobInfo(self, jobInfo):
         filename, currentTime, remainingTime, fileEstimate, donePercent = jobInfo
@@ -277,6 +283,7 @@ class Octobox:
         self.o = Octoprint()
         self.d = Display()
         self.w = Webcam()
+        self.elapsed = 0
         sendUART('KR:R?')
         self.setTimeout(15)
         sendUART('KR:D?')
@@ -441,6 +448,11 @@ class Octobox:
             lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} CPU:{tempCpu+0.5:2.0f} Env: 0')
         self.d.setTemps((tempExt, tempBed, tempCpu, 0))
 
+    def displayElapsed(self):
+        lcd.lcd_display_string(3, f'{printTime(self.elapsed)}        @100.0%')
+        lcd.lcd_display_string(4, datetime.now().strftime("%H:%M"))
+        self.d.setElapsed(self.elapsed)
+
     def displayJob(self):
         filename, currentTime, remainingTime, fileEstimate, donePercent = self.o.getJobInfo()
         lcd.lcd_display_string(1, filename[-20:])
@@ -465,6 +477,7 @@ class Octobox:
 
             lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
             self.d.setJobInfo((filename, currentTime, remainingTime, fileEstimate, donePercent))
+            self.elapsed = currentTime
                 
     def loop(self):
         state = self.o.getState()
@@ -501,6 +514,7 @@ class Octobox:
         elif self.state == State.PRINTING:
             self.displayJob()
         elif self.state == State.COOLING:
+            self.displayElapsed()
             self.displayState('Cooling')
         elif self.state == State.COLD:
             self.displayState('Cold')
