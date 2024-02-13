@@ -46,7 +46,8 @@
           }
       }
 
-      function setupImage() {
+      async function setupImage() {
+          let image = await fetch("image.jpg", { cache: 'no-cache', mode: 'no-cors' });
           document.getElementById("webcam").src = "image.jpg";
       }
 

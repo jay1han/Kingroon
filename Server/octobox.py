@@ -85,8 +85,8 @@ class Display:
                 etas = eta2.strftime("%H:%M")
 
             jobInfoText += f'<tr><td>ETA</td><td>{etas}</td></tr>'
-            jobInfoText += f'<tr><td>Now</td><td>{datetime.now().strftime("%H:%M")}</td></tr>'
             self.lastNow = datetime.now().strftime("%H:%M")
+            jobInfoText += f'<tr><td>Now</td><td>{self.lastNow}</td></tr>'
             
         else:
             jobInfoText += f'<tr><td>Elapsed</td><td>{printTime0(self.jobInfo[1])}</td></tr>'
@@ -146,11 +146,11 @@ class Webcam:
         print(f'Started webcam process {self.Popen.pid}')
 
     def stop(self):
+        sendUART('KR:C1')
         if self.Popen is not None:
             print('Stop streamer')
             self.Popen.terminate()
-            self.Popen = None
-            sleep(1)
+            self.Popen.wait()
         self.capture()
         sendUART('KR:C0')
 
@@ -284,6 +284,7 @@ class Octobox:
         self.d = Display()
         self.w = Webcam()
         self.elapsed = 0
+        self.lastNow = datetime.now().strftime("%H:%M")
         sendUART('KR:R?')
         self.setTimeout(15)
         sendUART('KR:D?')
@@ -449,8 +450,8 @@ class Octobox:
         self.d.setTemps((tempExt, tempBed, tempCpu, 0))
 
     def displayElapsed(self):
-        lcd.lcd_display_string(3, f'{printTime(self.elapsed)}        @100.0%')
-        lcd.lcd_display_string(4, datetime.now().strftime("%H:%M"))
+        lcd.lcd_display_string(3, printTime(self.elapsed))
+        lcd.lcd_display_string(4, self.lastNow)
         self.d.setElapsed(self.elapsed)
 
     def displayJob(self):
@@ -475,7 +476,8 @@ class Octobox:
             eta2s = "..:.."
             if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
 
-            lcd.lcd_display_string(4, f'{datetime.now().strftime("%H:%M")}) {eta1s} ~ {eta2s}')
+            self.lastNow = datetime.now().strftime("%H:%M")
+            lcd.lcd_display_string(4, f'{self.lastNow}) {eta1s} ~ {eta2s}')
             self.d.setJobInfo((filename, currentTime, remainingTime, fileEstimate, donePercent))
             self.elapsed = currentTime
                 
