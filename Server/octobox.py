@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from octo_lib import HD44780, UART, lock_lib, free_lib, sendUART
+from octoconf import *
 from time import sleep
 
 lcd = HD44780()
@@ -23,7 +24,7 @@ def printTime(seconds):
         return '..:..'
     return text
 
-NO_TEMPS   = (0.0, 0.0, 0.0, 0.0)
+NO_TEMPS   = (0.0, 0.0, 0.0, 0.0, 0.0)
 NO_JOBINFO = ('', 0, 0, 0, 0.0)
 
 class Display:
@@ -38,11 +39,15 @@ class Display:
             print(statusText, file=target)
 
     def setTemps(self, temps):
-        tempExt, tempBed, tempCpu, tempEnv = temps
+        tempExt, tempBed, tempCpu, tempEnv, tempCold = temps
         if tempExt == 0.0:
             temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
         else:
-            temps = f'<tr><td>Extruder</td><td>{tempExt+0.5:.1f}&deg;</td></tr><tr><td>Bed</td><td>{tempBed+0.5:.1f}&deg;</td></tr>'
+            temps = f'<tr><td>Extruder</td><td>{tempExt+0.05:.1f}&deg;</td></tr>'
+            if tempCold == 0.0:
+                temps += f'<tr><td>Bed</td><td>{tempBed+0.05:.1f}&deg;</td></tr>'
+            else:
+                temps += f'<tr><td>Bed</td><td>{tempBed+0.05:.1f}&deg;({tempCold+0.05:.1f})</td></tr>'
         temps += f'<tr><td>CPU</td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
         if tempEnv == 0.0:
             temps += f'<tr><td>Env</td><td></td></tr>'
@@ -412,7 +417,7 @@ class Octobox:
             self.timeout = None
         else:
             tempExt, tempBed = self.o.getTemps()
-            if tempBed < 30.0:
+            if tempBed < TEMP_COLD:
                 sendUART('KR:B2')
                 self.o.disconnect()
                 self.state = State.COLD
@@ -440,14 +445,14 @@ class Octobox:
         lcd.lcd_display_string(1, state)
         self.d.setState(state)
 
-    def displayTemps(self):
+    def displayTemps(self, tempCold=0.0):
         tempExt, tempBed = self.o.getTemps()
         tempCpu = readCpuTemp()
         if tempExt == 0.0:
             lcd.lcd_display_string(2, f'       CPU:{tempCpu+0.5:2.0f} Env: 0')
         else:
             lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} CPU:{tempCpu+0.5:2.0f} Env: 0')
-        self.d.setTemps((tempExt, tempBed, tempCpu, 0))
+        self.d.setTemps((tempExt, tempBed, tempCpu, 0.0, tempCold))
 
     def displayElapsed(self):
         lcd.lcd_display_string(3, printTime(self.elapsed))
@@ -505,7 +510,10 @@ class Octobox:
         elif self.state == State.CLOSED:
             self.processCLOSED(state, command, event)
 
-        self.displayTemps()
+        if self.state == State.COOLING:
+            self.displayTemps(TEMP_COLD)
+        else:
+            self.displayTemps()
         
         if self.state == State.OFF:
             self.displayState('Printer Off')
