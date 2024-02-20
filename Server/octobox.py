@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 from octo_lib import HD44780, UART, lock_lib, free_lib, sendUART
-from octoconf import *
 from time import sleep
 
 lcd = HD44780()
@@ -23,6 +22,10 @@ def printTime(seconds):
     if text == '':
         return '..:..'
     return text
+
+def readTempConfig():
+    with open('temp.conf', 'r') as temp:
+        return float(temp.read().strip())
 
 NO_TEMPS   = (0.0, 0.0, 0.0, 0.0, 0.0)
 NO_JOBINFO = ('', 0, 0, 0, 0.0)
@@ -417,7 +420,7 @@ class Octobox:
             self.timeout = None
         else:
             tempExt, tempBed = self.o.getTemps()
-            if tempBed < TEMP_COLD:
+            if tempBed < readTempConfig():
                 sendUART('KR:B2')
                 self.o.disconnect()
                 self.state = State.COLD
