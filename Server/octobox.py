@@ -24,7 +24,7 @@ def printTime(seconds):
     return text
 
 def readTempConfig():
-    with open('temp.conf', 'r') as temp:
+    with open('/usr/share/octobox/temp.conf', 'r') as temp:
         return float(temp.read().strip())
 
 NO_TEMPS   = (0.0, 0.0, 0.0, 0.0, 0.0)
@@ -514,7 +514,7 @@ class Octobox:
             self.processCLOSED(state, command, event)
 
         if self.state == State.COOLING:
-            self.displayTemps(TEMP_COLD)
+            self.displayTemps(readTempConfig())
         else:
             self.displayTemps()
         
