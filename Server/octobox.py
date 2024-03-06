@@ -46,16 +46,16 @@ class Display:
         if tempExt == 0.0:
             temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
         else:
-            temps = f'<tr><td>Extruder</td><td>{tempExt+0.05:.1f}&deg;</td></tr>'
+            temps = f'<tr><td>Extruder</td><td>{tempExt:.1f}&deg;</td></tr>'
             if tempCold == 0.0:
-                temps += f'<tr><td>Bed</td><td>{tempBed+0.05:.1f}&deg;</td></tr>'
+                temps += f'<tr><td>Bed</td><td>{tempBed:.1f}&deg;</td></tr>'
             else:
-                temps += f'<tr><td>Bed</td><td>{tempBed+0.05:.1f}&deg;({tempCold+0.05:.1f})</td></tr>'
-        temps += f'<tr><td>CPU</td><td>{tempCpu+0.05:.1f}&deg;</td></tr>'
+                temps += f'<tr><td>Bed</td><td>{tempBed:.1f}&deg;({tempCold:.1f})</td></tr>'
+        temps += f'<tr><td>CPU</td><td>{tempCpu:.1f}&deg;</td></tr>'
         if tempEnv == 0.0:
             temps += f'<tr><td>Env</td><td></td></tr>'
         else:
-            temps += f'<tr><td>Env</td><td>{tempEnv+0.05:.1f}&deg;</td></tr>'
+            temps += f'<tr><td>Env</td><td>{tempEnv:.1f}&deg;</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
@@ -139,7 +139,7 @@ class Webcam:
         usb_device = 0
         for line in list_devices:
             line_no += 1
-            if re.search('USB', line):
+            if re.search('Webcam', line):
                 usb_device = line_no
 
         self.device = list_devices[usb_device].strip()
@@ -148,7 +148,7 @@ class Webcam:
     def start(self):
         sendUART('KR:C1')
         webcamPopen = ['/usr/local/bin/mjpg_streamer',
-                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 640x480',
+                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 1920x1080',
                        '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
         self.Popen = subprocess.Popen(webcamPopen)
         print(f'Started webcam process {self.Popen.pid}')
@@ -163,7 +163,7 @@ class Webcam:
         sendUART('KR:C0')
 
     def capture(self):
-        subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '640x480', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
+        subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '1920x1080', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
         
 #################################################################
 # Monitor the UART, Octoprint info and events --> update the display
@@ -452,9 +452,9 @@ class Octobox:
         tempExt, tempBed = self.o.getTemps()
         tempCpu = readCpuTemp()
         if tempExt == 0.0:
-            lcd.lcd_display_string(2, f'       CPU:{tempCpu+0.5:2.0f} Env: 0')
+            lcd.lcd_display_string(2, f'       CPU:{tempCpu:2.0f} Env: 0')
         else:
-            lcd.lcd_display_string(2, f'{tempExt+0.5:3.0f}/{tempBed+0.5:2.0f} CPU:{tempCpu+0.5:2.0f} Env: 0')
+            lcd.lcd_display_string(2, f'{tempExt:3.0f}/{tempBed:2.0f} CPU:{tempCpu:2.0f} Env: 0')
         self.d.setTemps((tempExt, tempBed, tempCpu, 0.0, tempCold))
 
     def displayElapsed(self):
