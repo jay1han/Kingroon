@@ -149,7 +149,7 @@ class Webcam:
     def start(self):
         sendUART('KR:C1')
         webcamPopen = ['/usr/local/bin/mjpg_streamer',
-                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 1280x720',
+                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 1920x1080',
                        '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
         self.Popen = subprocess.Popen(webcamPopen)
         print(f'Started webcam process {self.Popen.pid}')
