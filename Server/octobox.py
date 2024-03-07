@@ -175,17 +175,19 @@ from enum import Enum
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
 
-cpuFan = False
+gpioFan = gpiod.Chip('gpiochip2', gpiod.Chip.OPEN_BY_NAME).get_line(15)
+gpioFan.request('Octobox')
+gpioFan.update()
+cpuFan = (gpioFan.get_value() == 1)
 CPU_HIGH_TEMP = 55.0
 CPU_LOW_TEMP  = 45.0
 def setFan(turnOn):
     global cpuFan
     cpuFan = turnOn
-    gpio = gpiod.Chip('gpiochip2', gpiod.Chip.OPEN_BY_NAME).get_line(15)
     if turnOn:
-        gpio.set_value(1)
+        gpioFan.set_value(1)
     else:
-        gpio.set_value(0)
+        gpioFan.set_value(0)
 
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
