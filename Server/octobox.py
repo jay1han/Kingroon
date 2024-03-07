@@ -2,6 +2,7 @@
 
 from octo_lib import HD44780, UART, lock_lib, free_lib, sendUART
 from time import sleep
+import gpiod
 
 lcd = HD44780()
 lcd.lcd_clear()
@@ -174,9 +175,26 @@ from enum import Enum
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
 
+cpuFan = False
+CPU_HIGH_TEMP = 55.0
+CPU_LOW_TEMP  = 45.0
+def setFan(turnOn):
+    global cpuFan
+    cpuFan = turnOn
+    gpio = gpiod.Chip('gpiochip2', gpiod.Chip.OPEN_BY_NAME).get_line(15)
+    if turnOn:
+        gpio.set_value(1)
+    else:
+        gpio.set_value(0)
+
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
-        return int(temp.read().strip()) / 1000.0
+        cpuTemp = int(temp.read().strip()) / 1000.0
+    if not cpuFan and cpuTemp > CPU_HIGH_TEMP:
+        setFan(True)
+    elif cpuFan and cpuTemp < CPU_LOW_TEMP:
+        setFan(False)
+    return cpuTemp
 
 def readEvent():
     lock = lock_lib()

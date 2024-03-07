@@ -22,11 +22,11 @@
 
           let value = document.getElementById("webcam").src;
           if (value.endsWith("jpg")) {
-              if (!stateText.startsWith("Printer")) {
+              if (!stateText.startsWith("Printer") && !stateText.startsWith("Door")) {
                   setupStream();
               }
           } else {
-              if (stateText.startsWith("Printer")) {
+              if (stateText.startsWith("Printer") || stateText.startsWith("Door")) {
                   setupImage();
               }
           }
