@@ -28,7 +28,7 @@ def readTempConfig():
     with open('/usr/share/octobox/temp.conf', 'r') as temp:
         return float(temp.read().strip())
 
-NO_TEMPS   = (0.0, 0.0, 0.0, 0.0, 0.0)
+NO_TEMPS   = (0.0, 0.0, 0.0, 0.0)
 NO_JOBINFO = ('', 0, 0, 0, 0.0)
 
 class Display:
@@ -43,7 +43,7 @@ class Display:
             print(statusText, file=target)
 
     def setTemps(self, temps):
-        tempExt, tempBed, tempCpu, tempEnv, tempCold = temps
+        tempExt, tempBed, tempCpu, tempCold = temps
         if tempExt == 0.0:
             temps = f'<tr><td>Extruder</td><td></td></tr><tr><td>Bed</td><td></td></tr>'
         else:
@@ -53,10 +53,10 @@ class Display:
             else:
                 temps += f'<tr><td>Bed</td><td>{tempBed:.1f}&deg;({tempCold:.1f})</td></tr>'
         temps += f'<tr><td>CPU</td><td>{tempCpu:.1f}&deg;</td></tr>'
-        if tempEnv == 0.0:
-            temps += f'<tr><td>Env</td><td></td></tr>'
+        if cpuFan:
+            temps += f'<tr><td>Fan</td><td>ON</td></tr>'
         else:
-            temps += f'<tr><td>Env</td><td>{tempEnv:.1f}&deg;</td></tr>'
+            temps += f'<tr><td>Fan</td><td>OFF</td></tr>'
 
         with open('/var/www/html/temps', 'w') as target:
             print(temps, file=target)
@@ -175,10 +175,12 @@ from enum import Enum
 import json
 APIKEY = 'D613EB0DBA174390A1B03FCDC16E7BA0'
 
-gpioFan = gpiod.Chip('gpiochip2', gpiod.Chip.OPEN_BY_NAME).get_line(15)
-gpioFan.request('Octobox')
+gpioChip = gpiod.Chip('2')
+gpioFan = gpioChip.get_line(15)
+gpioFan.request('Octobox', gpiod.LINE_REQ_DIR_OUT)
 gpioFan.update()
 cpuFan = (gpioFan.get_value() == 1)
+
 CPU_HIGH_TEMP = 55.0
 CPU_LOW_TEMP  = 45.0
 def setFan(turnOn):
@@ -192,9 +194,9 @@ def setFan(turnOn):
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
         cpuTemp = int(temp.read().strip()) / 1000.0
-    if not cpuFan and cpuTemp > CPU_HIGH_TEMP:
+    if  cpuTemp > CPU_HIGH_TEMP:
         setFan(True)
-    elif cpuFan and cpuTemp < CPU_LOW_TEMP:
+    elif cpuTemp < CPU_LOW_TEMP:
         setFan(False)
     return cpuTemp
 
@@ -471,11 +473,15 @@ class Octobox:
     def displayTemps(self, tempCold=0.0):
         tempExt, tempBed = self.o.getTemps()
         tempCpu = readCpuTemp()
-        if tempExt == 0.0:
-            lcd.lcd_display_string(2, f'       CPU:{tempCpu:2.0f} Env: 0')
+        if cpuFan:
+            fanText = ' (FAN)'
         else:
-            lcd.lcd_display_string(2, f'{tempExt:3.0f}/{tempBed:2.0f} CPU:{tempCpu:2.0f} Env: 0')
-        self.d.setTemps((tempExt, tempBed, tempCpu, 0.0, tempCold))
+            fanText = ''
+        if tempExt == 0.0:
+            lcd.lcd_display_string(2, f'       CPU:{tempCpu:2.0f}{fanText}')
+        else:
+            lcd.lcd_display_string(2, f'{tempExt:3.0f}/{tempBed:2.0f} CPU:{tempCpu:2.0f}{fanText}')
+        self.d.setTemps((tempExt, tempBed, tempCpu, tempCold))
 
     def displayElapsed(self):
         lcd.lcd_display_string(3, printTime(self.elapsed))
