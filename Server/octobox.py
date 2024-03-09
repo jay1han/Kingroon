@@ -2,6 +2,7 @@
 
 from octo_lib import HD44780, UART, lock_lib, free_lib, sendUART
 from time import sleep
+import os
 import gpiod
 
 lcd = HD44780()
@@ -24,6 +25,11 @@ def printTime(seconds):
         return '..:..'
     return text
 
+def replaceText(filename, text):
+    with open(filename + '.1', 'w') as target:
+        print(text, file=target)
+    os.replace(filename + '.1', filename)
+
 def readTempConfig():
     with open('/usr/share/octobox/temp.conf', 'r') as temp:
         return float(temp.read().strip())
@@ -39,8 +45,7 @@ class Display:
         self.clearInfo()
 
     def setState(self, statusText):
-        with open('/var/www/html/state', 'w') as target:
-            print(statusText, file=target)
+        replaceText('/var/www/html/state', statusText)
 
     def setTemps(self, temps):
         tempExt, tempBed, tempCpu, tempCold = temps
@@ -58,8 +63,7 @@ class Display:
         else:
             temps += f'<tr><td>Fan</td><td>OFF</td></tr>'
 
-        with open('/var/www/html/temps', 'w') as target:
-            print(temps, file=target)
+        replaceText('/var/www/html/temps', temps)
 
     def setElapsed(self, currentTime):
         jobInfoText = '<tr><td>File</td><td></td></tr>'
@@ -106,8 +110,7 @@ class Display:
                 jobInfoText += f'<tr><td>Ended</td><td> </td></tr>'
 
         self.jobInfo = jobInfo
-        with open('/var/www/html/jobInfo', 'w') as target:
-            print(jobInfoText, file=target)
+        replaceText('/var/www/html/jobInfo', jobInfoText)
 
     def clearInfo(self):
         self.setTemps(NO_TEMPS);
@@ -121,8 +124,7 @@ def setupIP():
     else:
         my_ip = 'localhost'
 
-    with open('/var/www/html/localIP', 'w') as target:
-        print(my_ip, file=target)
+    replaceText('/var/www/html/localIP', my_ip)
 
 class Webcam:
     def __init__(self):
