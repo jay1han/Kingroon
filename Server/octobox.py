@@ -30,9 +30,10 @@ def replaceText(filename, text):
         print(text, file=target)
     os.replace(filename + '.1', filename)
 
-def readTempConfig():
-    with open('/usr/share/octobox/temp.conf', 'r') as temp:
-        return float(temp.read().strip())
+with open('/usr/share/octobox/temp.conf', 'r') as temp:
+    coldTemp = int(temp.readline().strip())
+    lowTemp  = int(temp.readline().strip())
+    highTemp = int(temp.readline().strip())
 
 NO_TEMPS   = (0.0, 0.0, 0.0, 0.0)
 NO_JOBINFO = ('', 0, 0, 0, 0.0)
@@ -151,13 +152,12 @@ class Webcam:
     def start(self):
         sendUART('KR:C1')
         webcamPopen = ['/usr/local/bin/mjpg_streamer',
-                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 1920x1080',
+                       '-i', f'/usr/local/lib/mjpg-streamer/input_uvc.so -d {self.device} -n -r 1280x720',
                        '-o', '/usr/local/lib/mjpg-streamer/output_http.so -w /usr/local/share/mjpg-streamer/www']
         self.Popen = subprocess.Popen(webcamPopen)
         print(f'Started webcam process {self.Popen.pid}')
 
     def stop(self):
-        sendUART('KR:C1')
         if self.Popen is not None:
             print('Stop streamer')
             self.Popen.terminate()
@@ -166,7 +166,10 @@ class Webcam:
         sendUART('KR:C0')
 
     def capture(self):
-        subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '1920x1080', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
+        sendUART('KR:C1')
+        sleep(1)
+        subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '1280x720', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
+        sendUART('KR:C0')
         
 #################################################################
 # Monitor the UART, Octoprint info and events --> update the display
@@ -183,8 +186,6 @@ gpioFan.request('Octobox', gpiod.LINE_REQ_DIR_OUT)
 gpioFan.update()
 cpuFan = (gpioFan.get_value() == 1)
 
-CPU_HIGH_TEMP = 55.0
-CPU_LOW_TEMP  = 45.0
 def setFan(turnOn):
     global cpuFan
     cpuFan = turnOn
@@ -196,9 +197,9 @@ def setFan(turnOn):
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
         cpuTemp = int(temp.read().strip()) / 1000.0
-    if  cpuTemp > CPU_HIGH_TEMP:
+    if  cpuTemp > highTemp:
         setFan(True)
-    elif cpuTemp < CPU_LOW_TEMP:
+    elif cpuTemp < lowTemp:
         setFan(False)
     return cpuTemp
 
@@ -444,7 +445,7 @@ class Octobox:
             self.timeout = None
         else:
             tempExt, tempBed = self.o.getTemps()
-            if tempBed < readTempConfig():
+            if tempBed < coldTemp:
                 sendUART('KR:B2')
                 self.o.disconnect()
                 self.state = State.COLD
@@ -542,7 +543,7 @@ class Octobox:
             self.processCLOSED(state, command, event)
 
         if self.state == State.COOLING:
-            self.displayTemps(readTempConfig())
+            self.displayTemps(coldTemp)
         else:
             self.displayTemps()
         
