@@ -167,8 +167,10 @@ class Webcam:
 
     def capture(self):
         sendUART('KR:C1')
+        sendUART('KR:L1')
         sleep(1)
         subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '1280x720', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
+        sendUART('KR:L0')
         sendUART('KR:C0')
         
 #################################################################
