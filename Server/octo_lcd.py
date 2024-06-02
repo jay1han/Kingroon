@@ -1,26 +1,7 @@
-#!/usr/bin/python3
-
-# Common library for Octopus management
-
-import fcntl, os
-LOCK_FILE  = '/usr/share/octobox/octobox.lock'
-
-def lock_lib():
-   lock = open(LOCK_FILE, 'r+')
-   fcntl.lockf(lock, fcntl.LOCK_EX)
-   return lock
-
-def free_lib(lock, erase=False):
-   lock.close()
-   if erase:
-      os.truncate(LOCK_FILE, 0)
-      
-
-#################################################################
-# Display management
-
 import smbus2
-from time import sleep
+from periphery import PWM
+
+_PWM_BACKLIGHT = 1
 
 class i2c_device:
    def __init__(self, addr, port=0):
@@ -163,13 +144,4 @@ class HD44780:
    def lcd_clear(self):
       self.lcd_write(LCD_CLEARDISPLAY)
       self.lcd_write(LCD_RETURNHOME)
-
-#################################################################
-# Serial port
-
-import serial
-UART = serial.Serial('/dev/ttyS1', baudrate=9600, timeout=0)
-
-def sendUART(command):
-    UART.write((command + '\n').encode('utf-8'))
 
