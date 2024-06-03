@@ -31,3 +31,6 @@ class Sound:
     def stop(self):
         pass
     
+    def __del__(self):
+        self.stop()
+        

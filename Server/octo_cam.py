@@ -42,4 +42,7 @@ class Webcam:
         Peripheral.flash(1)
         subprocess.run(['/usr/bin/fswebcam', '-d', self.device, '-r', '1280x720', '-F', '1', '--no-banner', '/var/www/html/image.jpg'])
         Peripheral.flash(0)
+
+    def __del__(self):
+        self.stop()
         

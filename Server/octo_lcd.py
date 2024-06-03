@@ -1,7 +1,8 @@
 import smbus2
 from periphery import PWM
 
-_PWM_BACKLIGHT = 1
+_PWM_BACKL = 3
+_I2C_LCD   = 1
 
 class i2c_device:
    def __init__(self, addr, port=0):
@@ -87,7 +88,7 @@ Rs = 0b00000001 # Register select bit
 class HD44780:
    #initializes objects and lcd
    def __init__(self):
-      self.lcd_device = i2c_device(ADDRESS, 0)
+      self.lcd_device = i2c_device(ADDRESS, _I2C_LCD)
 
       self.lcd_write(0x03)
       self.lcd_write(0x03)
@@ -98,6 +99,12 @@ class HD44780:
       self.lcd_write(LCD_DISPLAYCONTROL | LCD_DISPLAYON)
       self.lcd_write(LCD_CLEARDISPLAY)
       self.lcd_write(LCD_ENTRYMODESET | LCD_ENTRYLEFT)
+
+      self._pwm = PWM(0, _PWM_BACKL)
+      self._pwm.frequency = 1000
+      self._pwm.duty_cycle = 0.5
+      self._pwm.enable()
+      
       sleep(0.2)
 
    # clocks EN to latch command
@@ -144,4 +151,16 @@ class HD44780:
    def lcd_clear(self):
       self.lcd_write(LCD_CLEARDISPLAY)
       self.lcd_write(LCD_RETURNHOME)
+
+   def backlight(self, brightness):
+      self._pwm.duty_cycle = brightness / 100
+
+   def __del__(self):
+      self.close()
+
+   def close(self):
+      if self._pwm is not None:
+         self._pwm.close()
+         self._pwm = None
+      
 

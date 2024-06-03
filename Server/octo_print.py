@@ -76,3 +76,6 @@ class Octoprint:
 
             return filename, currentTime, remainingTime, fileEstimate, donePercent
 
+    def __del__(self):
+        pass
+    

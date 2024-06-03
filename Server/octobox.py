@@ -28,6 +28,9 @@ class Octobox:
         self.setTimeout(15)
         sendUART('KR:D?')
 
+    def __del__(self):
+        pass
+
     def setTimeout(self, seconds):
         if seconds == 0:
             self.timeout = None

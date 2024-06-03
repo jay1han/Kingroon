@@ -106,3 +106,7 @@ class Display:
         self.setTemps(NO_TEMPS);
         self.setJobInfo(NO_JOBINFO);
 
+    def __del__(self):
+        self.lcd.close()
+        
+

@@ -1,3 +1,3 @@
 SUBSYSTEM=="gpio*", PROGRAM="/bin/sh -c 'chown -R root:gpio /sys/class/gpio && chmod -R 770 /sys/class/gpio'"
 SUBSYSTEM=="i2c*", PROGRAM="/bin/sh -c 'chown -R root:i2c /sys/class/i2c-dev && chmod -R 770 /sys/class/i2c-dev'"
-SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c 'chown -R root:pwm /sys/class/pwm && chmod -R 770 /sys/class/pwm'"
+SUBSYSTEM=="pwm*", PROGRAM="/bin/sh -c 'chown -R root:pwm /sys/class/pwm && chmod -R 770 /sys/class/pwm ; echo 3 > /sys/class/pwm/pwmchip0/export ; echo 1 > /sys/class/pwm/pwmchip0/export'"
