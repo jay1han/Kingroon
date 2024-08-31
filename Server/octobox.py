@@ -6,6 +6,13 @@ import subprocess, re, os, signal
 from datetime import time, datetime, timedelta
 from enum import Enum
 
+from octo_print import Octoprint
+from octo_socket import Socket
+from octo_sound import Sound
+from octo_periph import Peripheral
+from octo_cam import Camera
+from octo_disp import Display
+
 class State(Enum):
     OFF      = 0
     POWERON  = 1
@@ -18,10 +25,8 @@ class State(Enum):
 class Octobox:
     def __init__(self):
         self.state = State.OFF
+
         self.timeout = None
-        self.o = Octoprint()
-        self.d = Display()
-        self.w = Webcam()
         self.elapsed = 0
         self.lastNow = datetime.now().strftime("%H:%M")
         sendUART('KR:R?')

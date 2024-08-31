@@ -2,7 +2,7 @@ from time import sleep
 from octo_lcd import HD44780
 import json
 
-JSON_FILE = "/var/www/html/json"
+_JSON_FILE = "/var/www/html/json"
 
 def printTime0(seconds):
     if seconds == 0:
@@ -15,7 +15,7 @@ def printTime(seconds):
         return '..:..'
     return text
 
-class Display:
+class _Display:
     def __init__(self):
         self.lcd = HD44780()
         self.lcd.lcd_clear()
@@ -109,4 +109,4 @@ class Display:
     def __del__(self):
         self.lcd.close()
         
-
+Display = _Display()

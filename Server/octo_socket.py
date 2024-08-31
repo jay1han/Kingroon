@@ -2,7 +2,7 @@ import fcntl, os, socket
 
 SOCK_FILE  = '/usr/share/octobox/socket'
 
-class Socket:
+class _Socket:
    def __init__(self):
       pass
    
@@ -31,3 +31,4 @@ class Socket:
       free_lib(lock, erase=True);
       return response
 
+Socket = _Socket()

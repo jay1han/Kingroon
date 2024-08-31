@@ -18,7 +18,7 @@ def readCpuTemp():
         setFan(False)
     return cpuTemp
 
-class Peripheral:
+class _Peripheral:
     def __init__(self):
         self._flash = 0
         self._flashGpio = GPIO("/dev/gpiochip0", _GPIO_FLASH, "out")
@@ -88,4 +88,5 @@ class Peripheral:
         self.relay(0)
         self._run = False
         self._thread.join()
-        
+
+Peripheral = _Peripheral()

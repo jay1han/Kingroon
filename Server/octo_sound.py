@@ -4,17 +4,21 @@ from periphery import PWM
 
 _PWM_BUZZER = 1
 
-class Sound:
-    OFF    = 0
-    SINGLE = 1
-    TRIPLE = 2
-    MULTI  = 3
-    LONG   = 4
+from enum import Enum
 
-    _SHORT = timedelta(milliseconds = 100)
-    _SPACE = timedelta(milliseconds = 500)
-    _LONG  = timedelta(seconds = 2)
-    
+class _Sound:
+    STOP     = 0
+    TOUCH    = 1      # 1 short beep
+    TOUCHLG  = 2      # 3 short beeps and one long
+    OPEN     = 3      # Encounters : A+B+GG-D
+    CLOSE    = 4      # Beethoven 5 : GGGEb
+    POWERON  = 5      # Leone : C#F#C#F#C#
+    POWEROFF = 6      # Every Breath You Take : CDCBA
+    START    = 7      # Star Trek : BEA+G#
+    CANCEL   = 8      # Toccata & Fugue : A+GA+
+    COOLING  = 9      # Let it go : FGA+bC
+    COLD     = 10     # Ode a la joie : BBCD
+
     def __init__(self):
         self._pwm = PWM(0, _PWM_BUZZER)
         self._pwm.frequency = 1000
@@ -34,3 +38,4 @@ class Sound:
     def __del__(self):
         self.stop()
         
+Sound = _Sound()
