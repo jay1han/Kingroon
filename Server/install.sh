@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+apt install python3-smbus
+
 mkdir -v /usr/share/octobox
 cp -v octo*.py /usr/share/octobox/
 touch /usr/share/octobox/socket
@@ -18,8 +20,19 @@ addgroup gpio
 addgroup i2c
 addgroup pwm
 usermod -aG gpio,i2c,pwm,www-data octoprint 
+usermod -aG gpio,i2c,pwm,www-data jay
 
 cp -v files/99-i2c.rules /etc/udev/rules.d/
+chmod g+w /sys/class/pwm/pwmchip0/export
+chmod g+w /sys/class/pwm/pwmchip0/unexport
+chmod g+w /sys/class/pwm/pwmchip0/pwm1/enable
+chmod g+w /sys/class/pwm/pwmchip0/pwm1/duty_cycle
+chmod g+w /sys/class/pwm/pwmchip0/pwm1/period
+chmod g+w /sys/class/pwm/pwmchip0/pwm1/polarity
+chmod g+w /sys/class/pwm/pwmchip0/pwm2/enable
+chmod g+w /sys/class/pwm/pwmchip0/pwm2/duty_cycle
+chmod g+w /sys/class/pwm/pwmchip0/pwm2/period
+chmod g+w /sys/class/pwm/pwmchip0/pwm2/polarity
 
 cp -v files/octobox.service /etc/systemd/system/
 systemctl daemon-reload

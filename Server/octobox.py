@@ -277,8 +277,12 @@ class Octobox:
         elif self.state == State.CLOSED:
             self.displayState('Door Closed')
             
-octo = Octobox()
+# octo = Octobox()
 
-while(True):
-    octo.loop()
-    sleep(1)
+# while(True):
+#     octo.loop()
+#     sleep(1)
+
+peripheral = Peripheral()
+
+peripheral.light(True)

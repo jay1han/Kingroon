@@ -6,7 +6,7 @@ _PWM_BUZZER = 1
 
 from enum import Enum
 
-class _Sound:
+class Sound:
     STOP     = 0
     TOUCH    = 1      # 1 short beep
     TOUCHLG  = 2      # 3 short beeps and one long
@@ -37,5 +37,3 @@ class _Sound:
     
     def __del__(self):
         self.stop()
-        
-Sound = _Sound()

@@ -15,7 +15,7 @@ def printTime(seconds):
         return '..:..'
     return text
 
-class _Display:
+class Display:
     def __init__(self):
         self.lcd = HD44780()
         self.lcd.lcd_clear()
@@ -108,5 +108,3 @@ class _Display:
 
     def __del__(self):
         self.lcd.close()
-        
-Display = _Display()

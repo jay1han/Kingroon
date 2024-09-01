@@ -2,7 +2,7 @@ from urllib.request import urlopen, Request
 import json
 APIKEY = "FF658CA6454E4341A3E25EED78AEA214"
 
-class _Octoprint:
+class Octoprint:
     def __init__(self):
         pass
 
@@ -78,5 +78,3 @@ class _Octoprint:
 
     def __del__(self):
         pass
-
-Octoprint = _Octoprint

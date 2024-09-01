@@ -1,7 +1,7 @@
 import subprocess, os
 from octo_periph import Peripheral
 
-class _Camera:
+class Camera:
     def __init__(self, peripheral: Peripheral):
         self.peripheral = peripheral
         ps = subprocess.run(['/usr/bin/ps', '-C', 'mjpg_streamer', '--no-headers', '-o', 'pid'],
@@ -47,5 +47,3 @@ class _Camera:
 
     def __del__(self):
         self.stop()
-        
-Camera = _Camera()
