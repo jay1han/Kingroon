@@ -29,9 +29,12 @@ class Octobox:
         self.timeout = None
         self.elapsed = 0
         self.lastNow = datetime.now().strftime("%H:%M")
-        sendUART('KR:R?')
-        self.setTimeout(15)
-        sendUART('KR:D?')
+
+        self.p = Peripheral()
+        self.s = Sound()
+        self.c = Camera(self.p)
+        self.o = Octoprint()
+        self.d = Display()
 
     def __del__(self):
         pass
@@ -234,7 +237,6 @@ class Octobox:
                 
     def loop(self):
         state = self.o.getState()
-        command = readUART()
         event = readEvent()
 
         print(f'{self.state} -> "{state}", "{command}"')
@@ -283,8 +285,4 @@ class Octobox:
 #     octo.loop()
 #     sleep(1)
 
-peripheral = Peripheral()
-sound = Sound()
-camera = Camera(peripheral)
-octoprint = Octoprint()
-
+octobox = Octobox()

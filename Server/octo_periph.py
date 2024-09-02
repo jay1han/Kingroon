@@ -33,9 +33,12 @@ class Peripheral:
         self._reed = 0
         self._reedGpio = GPIO("/dev/gpiochip0", _GPIO_REED, "in")
         self._reedGpio.bias = "pull_up"
-        self._touch = 1
+        self._touch = 0
         self._touchGpio = GPIO("/dev/gpiochip0", _GPIO_TOUCH, "in")
-        self._touchDown = datetime.now()
+        self._touchDown = 0
+        
+        self.longTouch = False
+        self.doorClosed = not self._reedGpio.read()
 
         self._running = False
         self._thread = Thread(target = self._run, name = "peripheral", daemon = True)
@@ -44,7 +47,9 @@ class Peripheral:
     def _run(self):
         self._running = True;
         while (self._running):
+            self.doorClosed = not self._reedGpio.read()
             touch = int(self._touchGpio.read())
+            ## TODO
             sleep(0.1)
         
     def flash(self, state = None) -> int:

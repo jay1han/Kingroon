@@ -22,7 +22,6 @@ class Camera:
                 usb_device = line_no
 
         self._device = list_devices[usb_device].strip()
-        self._capture()
         
     def start(self):
         self._peripheral.flash(1)
@@ -44,10 +43,9 @@ class Camera:
             print('Stop streamer')
             self._Popen.terminate()
             self._Popen.wait()
-        self._capture()
         self._peripheral.flash(0)
 
-    def _capture(self):
+    def capture(self):
         self._peripheral.flash(1)
         subprocess.run(
             [
