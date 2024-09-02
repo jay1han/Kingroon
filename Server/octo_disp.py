@@ -26,8 +26,8 @@ class Display:
         self._lcd.lcd_clear()
         self._lcd.lcd_display_string(1, "Octobox")
         self.setState('Printer')
-        self.jobInfo = _NO_JOBINFO
-        self.lastNow = datetime.now().strftime("%H:%M")
+        self.jobInfo = ['', 0.0, 0.0, 0.0, 0.0]
+        self.lastNow = ''
         self.clearInfo()
 
     def setupIP():
@@ -41,7 +41,7 @@ class Display:
     
     def setState(self, statusText):
         replaceText('/var/www/html/state', statusText)
-        self._lcd.lcd_display_string(1, state)
+        self._lcd.lcd_display_string(1, statusText)
 
     def setTemps(self, temps):
         tempExt, tempBed, tempCpu, tempCold = temps
@@ -122,8 +122,8 @@ class Display:
         replaceText('/var/www/html/jobInfo', jobInfoText)
 
     def clearInfo(self):
-        self.setTemps(_NO_TEMPS);
-        self.setJobInfo(_NO_JOBINFO);
+        self.setTemps([0.0, 0.0, 0.0, 0.0]);
+        self.setJobInfo(['', 0.0, 0.0, 0.0, 0.0]);
 
     def __del__(self):
         self._lcd.close()
