@@ -14,7 +14,7 @@ This software is intended to work together with the electronic design
 
 | State | Description | Transitions |
 |-------|-------------|-------------|
-| `OFF`   | Printer is powered off | Long-press button to power on |
+| `OFF`   | Printer is powered off | &rarr; `POWERON` |
 | `POWERON` | Printer is powering on | When Octoprint is connected &rarr; `IDLE` |
 | `IDLE` | Print is waiting | Start a job &rarr; `PRINTING` |
 | `PRINTING` | Print job in progress | End or cancel job &rarr; `COOLING` |
@@ -32,7 +32,7 @@ This software is intended to work together with the electronic design
 
     - `PRINTING` &rarr; `COOLING` (cancels the job)
 
-- *Flash* button toggles the camera flash
+- *Flash* button toggles the camera flash, which is also synchronized with video capture
 
 - *Light* button toogles the overhead light
 
@@ -40,7 +40,7 @@ This software is intended to work together with the electronic design
 
     - Short touch toggles overhead light
 
-    - Long touch turns printer on or off
+    - Long touch acts like the *Power* button
 
 ## Display
 
@@ -48,7 +48,7 @@ This software is intended to work together with the electronic design
 |----------|-------------|
 | `Off` | Printer is powered off |
 | `Operational` | Octoprint is ready, no job queued |
-| *Job name* | Printing or cooling or cold, shows the last print job if any |
+| *Job name* | Current or last print job if any |
 
 ## Events
 
@@ -105,35 +105,38 @@ Drives the GPIO inputs and outputs.
 
 | Function | Pin # | GPIO # | Method name |
 |----------|-------|--------|-------------|
-| Overhead light | XX | 257 | `light()` |
-| Camera flash | XX | 76 | `flash()` |
-| Fan | XX | 260 | `fan()` |
-| Relay output (power) | XX | 259 | `relay()` |
-| Reed input (door) | XX | 270 | `doorClosed` |
-| Touch input | XX 228 | `longTouch` |
+| Overhead light | 12 | 257 | `light()` |
+| Camera flash | 36 | 76 | `flash()` |
+| Fan | 38 | 260 | `fan()` |
+| Relay output (power) | 40 | 259 | `relay()` |
+| Reed input (door) | 16 | 270 | `doorClosed` |
+| Touch input | 18 | 228 | `longTouch` |
 
 - Short touch events (toggle overhead light) are processed directly by Peripheral.
 
 - A long touch event sets `longTouch` to `True`.
 The property must be reset to `False` when processing is done.
 
+- The overhead light is synchronized with the display's backlight.
+
 ### Sound (`octo_sound.py`)
 
-Call `Sound.start(id)` to generate the chime `id`
+Call `Sound.start(id)` to generate the chime `id`.
+`Sound.stop()` to stop it before it's finished.
 
-```
-    STOP     = 0
-    TOUCH    = 1      # 1 short beep
-    TOUCHLG  = 2      # 3 short beeps and one long
-    OPEN     = 3      # Encounters : A+B+GG-D
-    CLOSE    = 4      # Beethoven 5 : GGGEb
-    POWERON  = 5      # Leone : C#F#C#F#C#
-    POWEROFF = 6      # Every Breath You Take : CDCBA
-    START    = 7      # Star Trek : BEA+G#
-    CANCEL   = 8      # Toccata & Fugue : A+GA+
-    COOLING  = 9      # Let it go : FGA+bC
-    COLD     = 10     # Ode a la joie : BBCD
-```
+| Name | Index | When | What |
+|------|-------|------|------|
+| STOP | 0 | Stop sound | Any time |
+| TOUCH | 1 | Short touch beep | Short beep |
+| TOUCHLG | 2 | Long touch beep | Long beep|
+| OPEN | 3 | Door opening | Encounters of the Third Kind |
+| CLOSE | 4 | Door closing | Beethoven's 5th |
+| POWERON | 5 | Powering on | The Good, the Bad, and the Ugly |
+| POWEROFF | 6 | Powering off | Every Breath You Take |
+| START | 7 | Print starting | Star Trek |
+| CANCEL | 8 | Cancelling print | Toccata & Fugue |
+| COOLING | 9 | End of print | Let it go |
+| COLD | 10 | Print cold | Beethoven's 9th |
 
 ### Camera (`octo_cam.py`)
 
