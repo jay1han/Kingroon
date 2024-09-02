@@ -13,6 +13,15 @@ from octo_periph import Peripheral
 from octo_cam import Camera
 from octo_disp import Display
 
+def readCpuTemp():
+    with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
+        cpuTemp = int(temp.read().strip()) / 1000.0
+    if  cpuTemp > highTemp:
+        setFan(True)
+    elif cpuTemp < lowTemp:
+        setFan(False)
+    return cpuTemp
+
 class State(Enum):
     OFF      = 0
     POWERON  = 1
@@ -25,10 +34,8 @@ class State(Enum):
 class Octobox:
     def __init__(self):
         self.state = State.OFF
-
         self.timeout = None
         self.elapsed = 0
-        self.lastNow = datetime.now().strftime("%H:%M")
 
         self.p = Peripheral()
         self.s = Sound()
@@ -186,54 +193,9 @@ class Octobox:
             sendUART('KR:R0')
             self.setTimeout(5)
 
-    def displayState(self, state):
-        lcd.lcd_display_string(1, state)
-        self.d.setState(state)
-
-    def displayTemps(self, tempCold=0.0):
-        tempExt, tempBed = self.o.getTemps()
-        tempCpu = readCpuTemp()
-        if cpuFan:
-            fanText = ' (FAN)'
-        else:
-            fanText = ''
-        if tempExt == 0.0:
-            lcd.lcd_display_string(2, f'       CPU:{tempCpu:2.0f}{fanText}')
-        else:
-            lcd.lcd_display_string(2, f'{tempExt:3.0f}/{tempBed:2.0f} CPU:{tempCpu:2.0f}{fanText}')
-        self.d.setTemps((tempExt, tempBed, tempCpu, tempCold))
-
-    def displayElapsed(self):
-        lcd.lcd_display_string(3, printTime(self.elapsed))
-        lcd.lcd_display_string(4, self.lastNow)
-        self.d.setElapsed(self.elapsed)
-
     def displayJob(self):
-        filename, currentTime, remainingTime, fileEstimate, donePercent = self.o.getJobInfo()
-        lcd.lcd_display_string(1, filename[-20:])
-
-        if currentTime != 0:
-            lcd.lcd_display_string(3, f'{printTime(currentTime)}/ {printTime(fileEstimate)} @{donePercent:5.1f}%')
-
-            eta2 = eta1 = datetime.now()
-            if remainingTime != 0:
-                eta1 = (datetime.now() + timedelta(seconds = (remainingTime + 60))).replace(second=0)
-            if fileEstimate != 0:
-                eta2 = (datetime.now() - timedelta(seconds = currentTime) + timedelta(seconds = (fileEstimate + 60))).replace(second=0)
-            if eta2 < eta1:
-                eta = eta2
-                eta2 = eta1
-                eta1 = eta
-
-            eta1s = "..:.."
-            if eta1 > datetime.now(): eta1s = eta1.strftime("%H:%M")
-            eta2s = "..:.."
-            if eta2 > datetime.now(): eta2s = eta2.strftime("%H:%M")
-
-            self.lastNow = datetime.now().strftime("%H:%M")
-            lcd.lcd_display_string(4, f'{self.lastNow}) {eta1s} ~ {eta2s}')
-            self.d.setJobInfo((filename, currentTime, remainingTime, fileEstimate, donePercent))
-            self.elapsed = currentTime
+        self.d.setJobInfo((filename, currentTime, remainingTime, fileEstimate, donePercent))
+        self.elapsed = currentTime
                 
     def loop(self):
         state = self.o.getState()
@@ -258,31 +220,32 @@ class Octobox:
         elif self.state == State.CLOSED:
             self.processCLOSED(state, command, event)
 
+        tempExt, tempBed = self.o.getTemps()
+        tempCpu = readCpuTemp()
+        tempCold = 0.0
         if self.state == State.COOLING:
-            self.displayTemps(coldTemp)
-        else:
-            self.displayTemps()
+            tempCold = 35.0
+        self.d.setTemps((tempExt, tempBed, tempCpu, tempCold))
         
         if self.state == State.OFF:
-            self.displayState('Printer Off')
+            self.d.setState('Printer Off')
         elif self.state == State.POWERON:
-            self.displayState(state)
+            self.d.setState(state)
         elif self.state == State.IDLE:
-            self.displayState(state)
+            self.d.setState(state)
         elif self.state == State.PRINTING:
             self.displayJob()
         elif self.state == State.COOLING:
-            self.displayElapsed()
-            self.displayState('Cooling')
+            self.d.setElapsed(self.elapsed)
+            self.d.setState('Cooling')
         elif self.state == State.COLD:
-            self.displayState('Cold')
+            self.d.setState('Cold')
         elif self.state == State.CLOSED:
-            self.displayState('Door Closed')
+            self.d.setState('Door Closed')
             
-# octo = Octobox()
+octobox = Octobox()
 
 # while(True):
-#     octo.loop()
+#     octobox.loop()
 #     sleep(1)
 
-octobox = Octobox()

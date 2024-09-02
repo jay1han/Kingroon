@@ -10,15 +10,6 @@ _GPIO_RELAY = 259
 _GPIO_REED  = 270
 _GPIO_TOUCH = 228
     
-def readCpuTemp():
-    with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
-        cpuTemp = int(temp.read().strip()) / 1000.0
-    if  cpuTemp > highTemp:
-        setFan(True)
-    elif cpuTemp < lowTemp:
-        setFan(False)
-    return cpuTemp
-
 class Peripheral:
     def __init__(self):
         self._flash = 0
