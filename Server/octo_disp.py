@@ -1,6 +1,6 @@
 from time import sleep
 from octo_lcd import HD44780
-import json
+import json, os
 
 _JSON_FILE = "/var/www/html/json"
 
@@ -15,13 +15,18 @@ def printTime(seconds):
         return '..:..'
     return text
 
+def replaceText(filename, text):
+    with open(f"{filename}.1", "w") as newfile:
+        print(text, file=newfile)
+    os.replace(f"{filename}.1", filename)
+
 class Display:
     def __init__(self):
-        self.lcd = HD44780()
-        self.lcd.lcd_clear()
-        self.lcd.lcd_display_string(1, "Octobox")
+        self._lcd = HD44780()
+        self._lcd.lcd_clear()
+        self._lcd.lcd_display_string(1, "Octobox")
         self.setState('Printer')
-        self.jobInfo = NO_JOBINFO
+        self.jobInfo = _NO_JOBINFO
         self.lastNow = datetime.now().strftime("%H:%M")
         self.clearInfo()
 
@@ -103,8 +108,8 @@ class Display:
         replaceText('/var/www/html/jobInfo', jobInfoText)
 
     def clearInfo(self):
-        self.setTemps(NO_TEMPS);
-        self.setJobInfo(NO_JOBINFO);
+        self.setTemps(_NO_TEMPS);
+        self.setJobInfo(_NO_JOBINFO);
 
     def __del__(self):
-        self.lcd.close()
+        self._lcd.close()

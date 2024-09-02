@@ -1,13 +1,14 @@
 from threading import Thread
 from time import sleep
 from periphery import GPIO
+from datetime import datetime
 
-_GPIO_LIGHT = 6
-_GPIO_FLASH = 24
-_GPIO_FAN   = 26
-_GPIO_RELAY = 27
-_GPIO_REED  = 9
-_GPIO_TOUCH = 10
+_GPIO_LIGHT = 257
+_GPIO_FLASH = 76
+_GPIO_FAN   = 260
+_GPIO_RELAY = 259
+_GPIO_REED  = 270
+_GPIO_TOUCH = 228
     
 def readCpuTemp():
     with open('/sys/class/thermal/thermal_zone0/temp', 'r') as temp:
@@ -36,12 +37,13 @@ class Peripheral:
         self._touchGpio = GPIO("/dev/gpiochip0", _GPIO_TOUCH, "in")
         self._touchDown = datetime.now()
 
-        self._run = True
-        self._thread = Thread(target = self.run, name = "", daemon = True)
+        self._running = False
+        self._thread = Thread(target = self._run, name = "peripheral", daemon = True)
         self._thread.start()
 
-    def run(self):
-        while (self._run):
+    def _run(self):
+        self._running = True;
+        while (self._running):
             touch = int(self._touchGpio.read())
             sleep(0.1)
         
@@ -78,7 +80,7 @@ class Peripheral:
                 self._relay = 1 - self._relay
             else:
                 self._relay = state
-            self.relayGpio.write(bool(self._relay))
+            self._relayGpio.write(bool(self._relay))
         return self._relay
 
     def __del__(self):
@@ -86,5 +88,5 @@ class Peripheral:
         self.fan(0)
         self.light(0)
         self.relay(0)
-        self._run = False
-        self._thread.join()
+        self._running = False
+        self._thread.join(1.0)

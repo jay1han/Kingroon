@@ -1,5 +1,6 @@
 import smbus2
 from periphery import PWM
+from time import sleep
 
 _PWM_BACKL = 3
 _I2C_LCD   = 1

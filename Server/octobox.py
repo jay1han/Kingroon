@@ -284,5 +284,7 @@ class Octobox:
 #     sleep(1)
 
 peripheral = Peripheral()
+sound = Sound()
+camera = Camera(peripheral)
+octoprint = Octoprint()
 
-peripheral.light(True)
