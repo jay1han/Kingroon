@@ -2,8 +2,11 @@ import smbus2
 from periphery import PWM
 from time import sleep
 
+# LCD Address
+_ADDRESS = 0x27
+
 _PWM_BACKL = 3
-_I2C_LCD   = 1
+_I2C_LCD   = 2
 
 class i2c_device:
    def __init__(self, addr, port=0):
@@ -37,9 +40,6 @@ class i2c_device:
    def read_block_data(self, cmd):
       return self.bus.read_block_data(self.addr, cmd)
       
-# LCD Address
-ADDRESS = 0x27
-
 # commands
 LCD_CLEARDISPLAY = 0x01
 LCD_RETURNHOME = 0x02
@@ -89,7 +89,7 @@ Rs = 0b00000001 # Register select bit
 class HD44780:
    #initializes objects and lcd
    def __init__(self):
-      self.lcd_device = i2c_device(ADDRESS, _I2C_LCD)
+      self.lcd_device = i2c_device(_ADDRESS, _I2C_LCD)
 
       self.lcd_write(0x03)
       self.lcd_write(0x03)
@@ -103,7 +103,7 @@ class HD44780:
 
       self._pwm = PWM(0, _PWM_BACKL)
       self._pwm.frequency = 1000
-      self._pwm.duty_cycle = 0.5
+      self._pwm.duty_cycle = 0.1
       self._pwm.enable()
       
       sleep(0.2)

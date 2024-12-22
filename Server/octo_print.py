@@ -34,6 +34,11 @@ class Octoprint:
         self.request('job', '{ "command": "cancel" }')
 
     def getState(self):
+        # Offline
+        # Operational
+        # Printing
+        # Cancelling
+
         job = self.query('job')
         if job is None:
             return 'Disconnected'

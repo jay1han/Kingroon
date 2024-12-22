@@ -29,7 +29,7 @@ class Camera:
             [
                 '/home/jay/ustreamer/ustreamer',
                 '-d',  self._device,
-                '-s', '192.168.0.60', '-p', '8080',
+                '-s', '192.168.0.60', '-p', '60000',
                 '-r', '1280x720',
                 '-m', 'MJPEG',
                 '--device-timeout', '5',

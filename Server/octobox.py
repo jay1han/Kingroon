@@ -79,6 +79,10 @@ class Octobox:
             self.setTimeout(15)
 
     def processOFF(self, state, command, event):
+        # Door Close -> CLOSED
+        # Long touch -> POWERON (timer)
+        # Power button -> POWERON (timer)
+        
         if command == 'R1':
             self.d.setState('Printer On')
             self.state = State.POWERON
@@ -96,6 +100,8 @@ class Octobox:
             self.setTimeout(15)
 
     def processON(self, state, command, event):
+        # Timeout & Offline -> Connect
+        # Operational -> IDLE
         if command == 'TL' or event == 'RR':
             sendUART('KR:R0')
         elif command == 'R0':
@@ -242,10 +248,9 @@ class Octobox:
             self.d.setState('Cold')
         elif self.state == State.CLOSED:
             self.d.setState('Door Closed')
-            
+
+    def test(self):
+        self.s.start(Sound.POWERON)
+        
 octobox = Octobox()
-
-# while(True):
-#     octobox.loop()
-#     sleep(1)
-
+octobox.test()

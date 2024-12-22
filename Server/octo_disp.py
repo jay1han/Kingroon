@@ -24,11 +24,10 @@ class Display:
     def __init__(self):
         self._lcd = HD44780()
         self._lcd.lcd_clear()
-        self._lcd.lcd_display_string(1, "Octobox")
-        self.setState('Printer')
         self.jobInfo = ['', 0.0, 0.0, 0.0, 0.0]
         self.lastNow = ''
         self.clearInfo()
+        self.setState('Printer')
 
     def setupIP():
         list_if = subprocess.run(['/usr/bin/ip', 'addr'], capture_output=True, text=True).stdout
